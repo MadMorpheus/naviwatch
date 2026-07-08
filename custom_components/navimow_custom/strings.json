@@ -35,6 +35,12 @@
     "sensor": {
       "battery": {
         "name": "Akku"
+      },
+      "zone": {
+        "name": "Zone"
+      },
+      "mow_progress": {
+        "name": "Mähfortschritt"
       }
     },
     "binary_sensor": {

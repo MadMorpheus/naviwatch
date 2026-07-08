@@ -39,7 +39,7 @@ class NavimowMqttClient:
     def __init__(
         self,
         loop: asyncio.AbstractEventLoop,
-        on_message: Callable[[str, dict[str, Any]], None],
+        on_message: Callable[[str, Any, str], None],
         on_connection_changed: Callable[[bool], None] | None = None,
     ) -> None:
         self._loop = loop
@@ -154,7 +154,10 @@ class NavimowMqttClient:
         await self.connect()
 
     def _subscribe_all(self, client: mqtt_client.Client) -> None:
-        channels = ("state", "event", "attributes")
+        # "location" ist nicht Teil des offiziellen SDK-Kanalsatzes, liefert aber laut
+        # oeffentlich einsehbarem Fork-Code (pgoutsos/NavimowHA) Position/Zone/Fortschritt -
+        # noch nicht selbst live verifiziert (siehe location.py, dokumentation/sdk-notizen.md).
+        channels = ("state", "event", "attributes", "location")
         if not self._device_ids:
             for channel in channels:
                 client.subscribe(f"/downlink/vehicle/+/realtimeDate/{channel}")
@@ -196,7 +199,10 @@ class NavimowMqttClient:
         except (UnicodeDecodeError, ValueError):
             _LOGGER.debug("Navimow MQTT payload not JSON: topic=%s", msg.topic)
             return
-        if not isinstance(payload, dict):
+        # state/event/attributes liefern ein JSON-Objekt, location ein JSON-Array (siehe
+        # location.py) - beide Formen durchreichen, alles andere verwerfen.
+        if not isinstance(payload, (dict, list)):
             return
-        payload.setdefault("device_id", device_id)
-        self._loop.call_soon_threadsafe(self._on_message, msg.topic, payload)
+        if isinstance(payload, dict):
+            payload.setdefault("device_id", device_id)
+        self._loop.call_soon_threadsafe(self._on_message, msg.topic, payload, device_id)
