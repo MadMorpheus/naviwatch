@@ -39,6 +39,10 @@ Bestehende Community-Integrationen frieren nach ca. einer Stunde reproduzierbar 
 
 Nutzt intern die Domain `navimow_custom` und kann daher parallel zu anderen Navimow-Integrationen installiert werden, ohne Kollision — Parallelbetrieb ist optional, nicht zwingend.
 
+## Schon eine andere Navimow-Integration installiert?
+
+Kein Konflikt — NaviWatch nutzt eine eigene Domain und kann parallel zu `NavimowHA` (oder Forks) laufen. Beide behalten zum Vergleichen, oder die andere später entfernen (Einstellungen → Geräte & Dienste → Löschen), sobald du umgestiegen bist. Details in der [README](README.de.md#schon-eine-andere-navimow-integration-installiert-).
+
 ---
 
 *Inoffizielle Integration, nicht von Segway/Navimow autorisiert oder unterstützt. Unabhängig entwickelt anhand von Live-Tests gegen die reale API.*

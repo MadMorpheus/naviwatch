@@ -71,6 +71,14 @@ Diese Integration ist nicht im HACS-Standardstore — sie muss als Custom Reposi
 
 Nutzt intern die Domain `navimow_custom` und kann daher parallel zu anderen Navimow-Integrationen installiert werden, ohne Kollision — Parallelbetrieb ist optional, nicht zwingend.
 
+## Schon eine andere Navimow-Integration installiert? 🔀
+
+NaviWatch nutzt eine eigene Domain (`navimow_custom`) und **kann parallel** zur offiziellen `segwaynavimow/NavimowHA`-Integration (oder Forks davon) laufen, ohne Konflikt — nichts muss vorher entfernt werden.
+
+* **Beide behalten**: sinnvoll während der Testphase — du bekommst einen zweiten Satz Entitäten (Home Assistant hängt bei Namenskollision automatisch `_2` an), sodass du das Verhalten vergleichen kannst, bevor du dich festlegst.
+* **Ganz umsteigen**: sobald du NaviWatch vertraust, entferne die andere Integration über Einstellungen → Geräte & Dienste → dort auswählen → Drei-Punkte-Menü → **Löschen**. Danach Automationen/Dashboards, die auf die alten Entity-IDs verweisen, auf die NaviWatch-Entitäten umstellen (Einstellungen → Geräte & Dienste → NaviWatch → Geräteseite zeigt die aktuellen Entity-IDs).
+* Es gibt keine automatische Migration von Einstellungen oder Verlaufsdaten zwischen den beiden Integrationen — jede behält ihre eigenen Entitäten und ihren eigenen Verlauf.
+
 ## Usage 🎮
 
 Nach dem Einrichten (OAuth2-Login mit deinem Segway-Account) siehst du:

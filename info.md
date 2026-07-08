@@ -39,6 +39,10 @@ Existing community integrations reproducibly freeze after about an hour and don'
 
 Uses the `navimow_custom` domain internally and can therefore be installed alongside other Navimow integrations without collision — running both is optional, not required.
 
+## Already have another Navimow integration installed?
+
+No conflict — NaviWatch uses its own domain and can run side by side with `NavimowHA` (or forks). Keep both to compare, or remove the other one later via Settings → Devices & Services → Delete once you've switched over. See the [README](README.md#already-have-another-navimow-integration-installed-) for details.
+
 ---
 
 *Unofficial integration, not authorized or supported by Segway/Navimow. Independently developed from live testing against the real API.*

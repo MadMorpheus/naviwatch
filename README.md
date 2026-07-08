@@ -71,6 +71,14 @@ This integration is not in the default HACS store — it must be added as a cust
 
 Uses the `navimow_custom` domain internally, so it can be installed alongside other Navimow integrations without collision — running both is optional, not required.
 
+## Already have another Navimow integration installed? 🔀
+
+NaviWatch uses its own domain (`navimow_custom`), so it **can run side by side** with the official `segwaynavimow/NavimowHA` integration (or forks of it) without any conflict — no need to remove anything first.
+
+* **Keep both**: useful while you're evaluating NaviWatch — you'll get a second set of entities (Home Assistant appends `_2` to names if they'd otherwise collide) so you can compare behavior before committing.
+* **Switch over fully**: once you trust NaviWatch, remove the other integration via Settings → Devices & Services → find it → three-dot menu → **Delete**. Afterwards, update any automations/dashboards that reference the old entity IDs to point to NaviWatch's entities instead (Settings → Devices & Services → NaviWatch → device page lists the current entity IDs).
+* There is no automatic migration of settings or history between the two integrations — each keeps its own entities and state history.
+
 ## Usage 🎮
 
 After setup (OAuth2 login with your Segway account), you'll see:
