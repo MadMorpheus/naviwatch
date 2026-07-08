@@ -1,19 +1,21 @@
 # NaviWatch
 
-Inoffizielle Home Assistant-Integration für Segway Navimow-Mähroboter.
+🇬🇧 English | 🇩🇪 [Deutsch](README.de.md)
+
+Unofficial Home Assistant integration for Segway Navimow robotic mowers.
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=MadMorpheus&repository=naviwatch&category=Integration)
 
-Eigenständig entwickelt anhand des live beobachteten Segway-API-Verhaltens — kein Code aus dem offiziellen `navimow-sdk` übernommen, keine Abhängigkeit zu anderen Navimow-Integrationen.
+Independently developed against live-observed Segway API behavior — no code taken from the official `navimow-sdk`, no dependency on other Navimow integrations.
 
-## Warum diese Integration? 🐛→✅
+## Why this integration? 🐛→✅
 
-Bestehende Community-Integrationen frieren nach ca. einer Stunde reproduzierbar ein und erholen sich nicht von selbst — nur ein manueller Reload hilft. NaviWatch löst genau dieses Problem mit einem eingebauten Watchdog:
+Existing community integrations reproducibly freeze after about an hour and don't recover on their own — only a manual reload helps. NaviWatch was built specifically to fix this with a built-in watchdog:
 
-* Vergleicht bei jedem REST-Poll den Status mit dem zuletzt per MQTT bekannten Zustand
-* Bei Diskrepanz wird ein MQTT-Reconnect erzwungen
-* Debounce verhindert, dass derselbe anhaltende Mismatch wiederholt unnötig reconnectet
-* Live über mehrere Stunden getestet, inklusive vollständigem Mähzyklus, automatisiertem Stopp und manuellem Docken — kein Freeze, kein manueller Eingriff nötig
+* Compares the REST-polled status against the last known MQTT status on every poll
+* Forces an MQTT reconnect on a mismatch
+* Debounce prevents the same persisting mismatch from triggering unnecessary repeated reconnects
+* Live-tested over several hours, including a full mowing cycle, an automated stop, and manual docking — no freeze, no manual intervention needed
 
 ## Features ✨
 
@@ -25,66 +27,66 @@ Bestehende Community-Integrationen frieren nach ca. einer Stunde reproduzierbar 
 
 ### Device Monitoring
 
-* Echtzeit-Mähstatus (`lawn_mower`-Entity)
-* Akku-Sensor
-* MQTT-Verbindungsstatus als Diagnose-Sensor
+* Real-time mower state (`lawn_mower` entity)
+* Battery sensor
+* MQTT connection status as a diagnostic sensor
 
 ### Real-Time Communication
 
-* Hybrid aus REST-Poll (Ground Truth) und MQTT-Push
-* MQTT-Updates reagieren innerhalb von Sekunden auf echte Zustandswechsel
+* Hybrid of REST polling (ground truth) and MQTT push
+* MQTT updates react within seconds to real state changes
 
 ### Native Home Assistant Integration
 
-* Native `lawn_mower`-Entity, volle Automations-Kompatibilität
-* Eigenes Brand-Icon/Logo
-* Übersetzt: Deutsch, Englisch
+* Native `lawn_mower` entity, full automation compatibility
+* Own brand icon/logo
+* Translated: English, German
 
-## Was diese Integration (bisher) NICHT kann
+## What this integration can't (yet) do
 
-* **Keine Positions-/Kartendaten (Zonen)** — nach ausführlichem Live-Test über REST und alle bekannten MQTT-Kanäle nicht erreichbar
-* **Kein Mähfortschritt/Restzeit** — kein entsprechendes Feld in irgendeiner beobachteten API-Antwort
+* **No position/map data (zones)** — not reachable after extensive live testing across REST and all known MQTT channels
+* **No mowing progress/remaining time** — no corresponding field in any observed API response
 
 ## Prerequisites 📋
 
-* Home Assistant, getestet mit Core **2026.5.4** (empfohlen ≥ 2026.3 für lokale Brand-Icons)
-* Segway-Account, der sich in der offiziellen Navimow-App anmelden kann
+* Home Assistant, tested with Core **2026.5.4** (≥ 2026.3 recommended for local brand icons)
+* A Segway account that can sign in to the official app
 
 ## Installation 🛠️
 
-Diese Integration ist nicht im HACS-Standardstore — sie muss als Custom Repository hinzugefügt werden:
+This integration is not in the default HACS store — it must be added as a custom repository:
 
-1. HACS → Integrations → Menü oben rechts → **Custom repositories**
+1. HACS → Integrations → top-right menu → **Custom repositories**
 2. Repository: `https://github.com/MadMorpheus/naviwatch`
 3. Category: **Integration**
-4. Nach `NaviWatch` suchen und installieren
-5. Home Assistant neu starten
-6. Einstellungen → Geräte & Dienste → Integration hinzufügen → `NaviWatch` suchen
+4. Search for `NaviWatch` and install it
+5. Restart Home Assistant
+6. Settings → Devices & Services → Add Integration → search `NaviWatch`
 
-**Manuelle Installation** (alternativ, ohne HACS):
+**Manual installation** (alternative, without HACS):
 
-1. `custom_components/navimow_custom/` aus diesem Repo nach `<config>/custom_components/navimow_custom/` kopieren
-2. Home Assistant neu starten
-3. Einstellungen → Geräte & Dienste → Integration hinzufügen → `NaviWatch` suchen
+1. Copy `custom_components/navimow_custom/` from this repo to `<config>/custom_components/navimow_custom/`
+2. Restart Home Assistant
+3. Settings → Devices & Services → Add Integration → search `NaviWatch`
 
-Nutzt intern die Domain `navimow_custom` und kann daher parallel zu anderen Navimow-Integrationen installiert werden, ohne Kollision — Parallelbetrieb ist optional, nicht zwingend.
+Uses the `navimow_custom` domain internally, so it can be installed alongside other Navimow integrations without collision — running both is optional, not required.
 
 ## Usage 🎮
 
-Nach dem Einrichten (OAuth2-Login mit deinem Segway-Account) siehst du:
+After setup (OAuth2 login with your Segway account), you'll see:
 
-* Eine `lawn_mower`-Entity (Start/Pause/Dock)
-* Einen Akku-`sensor`
-* Einen `binary_sensor` für den MQTT-Verbindungsstatus
+* A `lawn_mower` entity (start/pause/dock)
+* A battery `sensor`
+* A `binary_sensor` for the MQTT connection status
 
-Das Poll-Intervall lässt sich über die Integrations-Optionen anpassen.
+The poll interval can be adjusted in the integration's options.
 
 ## Troubleshooting 🔧
 
-* Zeigt der Watchdog wiederholt Reconnects in den Logs (`Navimow Watchdog: ...`)? Das ist normales Verhalten bei einem echten Zustandswechsel — bei anhaltend gleichem Mismatch greift ein 5-Minuten-Debounce, damit nicht unnötig wiederholt reconnectet wird.
-* Stelle sicher, dass sich dein Account in der offiziellen Navimow-App anmelden lässt — die Integration nutzt denselben OAuth2-Flow.
-* Bei Problemen: Home-Assistant-Logs auf Meldungen von `custom_components.navimow_custom` prüfen und ein Issue mit relevanten Log-Ausschnitten eröffnen: `https://github.com/MadMorpheus/naviwatch/issues`
+* Seeing repeated reconnects in the logs (`Navimow Watchdog: ...`)? That's normal behavior for a real state change — a 5-minute debounce prevents unnecessary repeated reconnects for the same persisting mismatch.
+* Make sure your account can sign in to the official Navimow app — this integration uses the same OAuth2 flow.
+* If you run into issues: check the Home Assistant logs for messages from `custom_components.navimow_custom` and open an issue with relevant log excerpts: `https://github.com/MadMorpheus/naviwatch/issues`
 
-## Lizenz
+## License
 
-MIT — siehe [`LICENSE`](LICENSE).
+MIT — see [`LICENSE`](LICENSE).

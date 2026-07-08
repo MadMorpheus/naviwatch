@@ -1,42 +1,44 @@
-# NaviWatch — inoffizielle Navimow-Integration für Home Assistant
+# NaviWatch — unofficial Navimow integration for Home Assistant
 
-Eigenständige, inoffizielle Home-Assistant-Integration für Segway Navimow-Mähroboter — unabhängig entwickelt anhand des live beobachteten Segway-API-Verhaltens, kein Code aus dem offiziellen `navimow-sdk` übernommen.
+🇬🇧 English | 🇩🇪 [Deutsch](info.de.md)
 
-## Warum diese Integration?
+Monitor and control Segway Navimow robotic mowers in Home Assistant — independently developed against live-observed Segway API behavior, no code taken from the official `navimow-sdk`.
 
-Bestehende Community-Integrationen für den i220 frieren nach ca. einer Stunde reproduzierbar ein und erholen sich nicht von selbst — nur ein manueller Reload hilft. Diese Integration wurde gezielt gebaut, um genau dieses Problem zu lösen:
+## Why this integration?
 
-- **Watchdog gegen Freeze**: vergleicht bei jedem REST-Poll den Status mit dem zuletzt per MQTT bekannten Zustand; bei Diskrepanz wird ein MQTT-Reconnect erzwungen (mit Debounce, damit derselbe anhaltende Mismatch nicht wiederholt unnötig reconnectet)
-- Live über mehrere Stunden getestet, inklusive vollständigem Mähzyklus, automatisiertem Stopp und manuellem Docken — kein Freeze, kein manueller Eingriff nötig
+Existing community integrations reproducibly freeze after about an hour and don't recover on their own — only a manual reload helps. This integration was built specifically to fix that:
+
+- **Watchdog against freezes**: compares the REST-polled status against the last known MQTT status on every poll; forces an MQTT reconnect on a mismatch (with debounce, so the same persisting mismatch doesn't trigger unnecessary repeated reconnects)
+- Live-tested over several hours, including a full mowing cycle, an automated stop, and manual docking — no freeze, no manual intervention needed
 
 ## Features
 
-- `lawn_mower`-Entity: Start, Pause, Dock
-- Akku-Sensor
-- MQTT-Verbindungsstatus als Diagnose-Sensor
-- Hybrid aus REST-Poll (Ground Truth) und MQTT-Push (schnelle Updates innerhalb von Sekunden)
-- Eigenes Icon/Logo, Deutsch/Englisch übersetzt
+- `lawn_mower` entity: start, pause, dock
+- Battery sensor
+- MQTT connection status as a diagnostic sensor
+- Hybrid of REST polling (ground truth) and MQTT push (updates within seconds)
+- Own icon/logo, translated to English/German
 
-## Was diese Integration (bisher) NICHT kann
+## What this integration can't (yet) do
 
-- **Keine Positions-/Kartendaten (Zonen)** — nach ausführlichem Live-Test über REST und alle bekannten MQTT-Kanäle beim i220 nicht erreichbar
-- **Kein Mähfortschritt/Restzeit** — kein entsprechendes Feld in irgendeiner beobachteten API-Antwort
+- **No position/map data (zones)** — not reachable after extensive live testing across REST and all known MQTT channels
+- **No mowing progress/remaining time** — no corresponding field in any observed API response
 
-## Voraussetzungen
+## Prerequisites
 
-- Home Assistant (getestet mit Core 2026.5.4)
-- Segway-Account, der sich in der offiziellen Navimow-App anmelden kann
+- Home Assistant (tested with Core 2026.5.4)
+- A Segway account that can sign in to the official app
 
 ## Installation
 
-Noch nicht über HACS verfügbar — manuelle Installation:
+1. HACS → Integrations → top-right menu → **Custom repositories**
+2. Repository: `https://github.com/MadMorpheus/naviwatch`, Category: **Integration**
+3. Search for `NaviWatch` in HACS and install
+4. Restart Home Assistant
+5. Settings → Devices & Services → Add Integration → search `NaviWatch`
 
-1. `custom_components/navimow_custom/` nach `<config>/custom_components/navimow_custom/` kopieren
-2. Home Assistant neu starten
-3. Einstellungen → Geräte & Dienste → Integration hinzufügen → „NaviWatch" suchen
-
-Nutzt intern weiterhin die Domain `navimow_custom` (aus der Testphase) und kann daher parallel zu anderen Navimow-Integrationen installiert werden, ohne Kollision — Parallelbetrieb ist aber optional, nicht zwingend.
+Uses the `navimow_custom` domain internally and can therefore be installed alongside other Navimow integrations without collision — running both is optional, not required.
 
 ---
 
-*Inoffizielle Integration, nicht von Segway/Navimow autorisiert oder unterstützt. Unabhängig entwickelt anhand von Live-Tests gegen die reale API.*
+*Unofficial integration, not authorized or supported by Segway/Navimow. Independently developed from live testing against the real API.*
