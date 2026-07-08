@@ -1,0 +1,46 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "Anbieter wählen"
+      },
+      "reauth_confirm": {
+        "title": "Navimow erneut authentifizieren",
+        "description": "Die Anmeldung bei Segway ist abgelaufen oder wurde widerrufen. Bitte erneut anmelden."
+      }
+    },
+    "abort": {
+      "already_configured": "Gerät ist bereits konfiguriert",
+      "missing_config": "OAuth2-Konfiguration fehlt",
+      "reauth_successful": "Erneute Authentifizierung erfolgreich",
+      "oauth_error": "Fehler beim Abrufen des Zugriffstokens",
+      "oauth_timeout": "Zeitüberschreitung bei der Authentifizierung",
+      "oauth_unauthorized": "OAuth2-Autorisierung fehlgeschlagen"
+    },
+    "create_entry": {
+      "default": "Erfolgreich mit Navimow verbunden"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Navimow-Optionen",
+        "data": {
+          "poll_interval_seconds": "REST-Poll-Intervall (Sekunden)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "battery": {
+        "name": "Akku"
+      }
+    },
+    "binary_sensor": {
+      "mqtt_connected": {
+        "name": "MQTT verbunden"
+      }
+    }
+  }
+}

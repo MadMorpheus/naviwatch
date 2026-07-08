@@ -1,0 +1,21 @@
+# Internal notes, not part of the published integration
+CLAUDE.md
+CLAUDE_v*.md
+dokumentation/
+test-skripte/
+sdk-reference/
+
+# Local backups superseded by git history
+custom_components/**/*_v[0-9]*.py
+
+# Local secrets
+.mcp.json
+
+# Duplicate source assets (final copies live in custom_components/navimow_custom/brand/)
+/icon.png
+/logo.png
+
+# Python
+__pycache__/
+*.pyc
+.venv/

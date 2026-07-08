@@ -1,0 +1,12 @@
+{
+  "domain": "navimow_custom",
+  "name": "NaviWatch",
+  "codeowners": ["@MadMorpheus"],
+  "config_flow": true,
+  "documentation": "https://github.com/MadMorpheus/naviwatch",
+  "integration_type": "device",
+  "iot_class": "cloud_push",
+  "issue_tracker": "https://github.com/MadMorpheus/naviwatch/issues",
+  "requirements": ["paho-mqtt>=1.6.1"],
+  "version": "0.1.0"
+}
