@@ -135,7 +135,7 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
             access_token=self.api.access_token,
             device_ids=[self.device_id] if self.device_id else [],
         )
-        self._mqtt.connect()
+        await self._mqtt.connect()
 
     def _handle_mqtt_connection_changed(self, connected: bool) -> None:
         self._mqtt_connected = connected
@@ -156,7 +156,7 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
         except NavimowApiError as err:
             _LOGGER.warning("Navimow: MQTT-Zugangsdaten konnten nicht aufgefrischt werden: %s", err)
             return
-        self._mqtt.update_credentials(
+        await self._mqtt.update_credentials(
             username=mqtt_info.get("userName"),
             password=mqtt_info.get("pwdInfo"),
             access_token=self.api.access_token,
@@ -226,7 +226,7 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
                     canonical,
                     current.state,
                 )
-                self._mqtt.force_reconnect()
+                await self._mqtt.force_reconnect()
                 self._last_watchdog_reconnect = now
         else:
             # Mismatch aufgeloest (oder erster Poll ueberhaupt) - Debounce-Fenster zuruecksetzen,
@@ -237,7 +237,7 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
         # kein separates Refresh-Scheduling noetig (Poll-Intervall ist deutlich kuerzer als
         # die Token-Lebensdauer).
         if self._mqtt is not None:
-            self._mqtt.update_credentials(access_token=self.api.access_token)
+            await self._mqtt.update_credentials(access_token=self.api.access_token)
 
         return NavimowData(
             device_id=self.device_id,

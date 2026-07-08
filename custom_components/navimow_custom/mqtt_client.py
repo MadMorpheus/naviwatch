@@ -93,10 +93,14 @@ class NavimowMqttClient:
         client.on_message = self._on_mqtt_message
         return client
 
-    def connect(self) -> None:
+    async def connect(self) -> None:
         if not self._host:
             raise RuntimeError("configure() muss vor connect() aufgerufen werden")
-        self._client = self._build_client()
+        # _build_client() ruft intern client.tls_set() auf, das synchron Zertifikatsspeicher
+        # von der Platte liest (load_default_certs/set_default_verify_paths) - blockiert sonst
+        # den Event-Loop (von HAs Blocking-Call-Detektor live gemeldet, 2026-07-08). Deshalb im
+        # Executor-Thread bauen, nicht direkt im Event-Loop.
+        self._client = await self._loop.run_in_executor(None, self._build_client)
         self._client.connect_async(self._host, self._port, MQTT_KEEPALIVE_SECONDS)
         self._client.loop_start()
 
@@ -106,7 +110,7 @@ class NavimowMqttClient:
             self._client.disconnect()
         self.is_connected = False
 
-    def force_reconnect(self) -> None:
+    async def force_reconnect(self) -> None:
         """Fuer den Watchdog: erzwungener Neuaufbau, wenn REST-Poll eine Diskrepanz zeigt.
 
         paho's ws_set_options wirkt nur vor Verbindungsaufbau, daher Client komplett neu
@@ -114,9 +118,9 @@ class NavimowMqttClient:
         """
         _LOGGER.info("Navimow MQTT: erzwungener Reconnect (Watchdog-Diskrepanz erkannt)")
         self.disconnect()
-        self.connect()
+        await self.connect()
 
-    def update_credentials(
+    async def update_credentials(
         self,
         username: str | None = None,
         password: str | None = None,
@@ -147,7 +151,7 @@ class NavimowMqttClient:
             _LOGGER.debug("Navimow MQTT credentials updated, wird beim naechsten Reconnect uebernommen")
             return
         _LOGGER.debug("Navimow MQTT credentials updated waehrend getrennt, baue Client neu auf")
-        self.connect()
+        await self.connect()
 
     def _subscribe_all(self, client: mqtt_client.Client) -> None:
         channels = ("state", "event", "attributes")
