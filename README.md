@@ -81,11 +81,20 @@ NaviWatch uses its own domain (`navimow_custom`), so it **can run side by side**
 
 ## Usage 🎮
 
-After setup (OAuth2 login with your Segway account), you'll see:
+After setup (OAuth2 login with your Segway account), you'll get one device with the following entities:
 
-* A `lawn_mower` entity (start/pause/dock)
-* A battery `sensor`
-* A `binary_sensor` for the MQTT connection status
+| Entity | What it is |
+|---|---|
+| `lawn_mower` | The main entity. State is one of `mowing`, `paused`, `returning`, `docked`, `error`. Supports Start/Pause/Dock. Diagnostic attributes (`raw_state`, `mqtt_connected`, `last_rest_update`, `last_mqtt_update`) let you confirm the watchdog is working. |
+| Battery `sensor` | Battery percentage. |
+| MQTT connection `binary_sensor` (diagnostic) | Whether the fast MQTT push path is currently connected. Not an indicator of overall reachability — REST polling keeps the mower entity working regardless. |
+| Zone `sensor` | Current physical mowing zone/partition ID. This is an **internal ID assigned by Segway's backend**, not the same as the "Zone 1"/"Zone 2" labels in the app (confirmed live: two real zones showed IDs `9` and `4`). Attributes: `target_zone` (zone selected at mow start), `task_delay` (rain/schedule delay). |
+| Mowing progress `sensor` | Route-plan progress, 0–100% for the current task (not area coverage). Confirmed live to match the percentage shown in the official app exactly. |
+| Position X / Position Y `sensor` | Local Cartesian coordinates in meters, relative to the charging dock — **not GPS**. Useful for custom automations, e.g. defining your own sub-areas or detecting if the mower hasn't moved in a while. |
+| Distance from dock `sensor` | Derived (`sqrt(x² + y²)`) straight-line distance from the dock, in meters. Doubles as a stall/freeze signal — an unmoving value while `state=mowing` is suspicious. |
+| Heading `sensor` | Direction the mower currently faces, in degrees (0–360°). Relative to the same local coordinate system as position X/Y — not a compass. |
+
+**Zone, mowing progress, position, distance, and heading all come from an undocumented MQTT channel** discovered by inspecting a third-party fork's source code, not from the official API — see [Known risks](#known-risks--this-could-break-and-its-not-in-my-hands-) for what that means for long-term reliability.
 
 The poll interval can be adjusted in the integration's options.
 

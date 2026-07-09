@@ -81,11 +81,20 @@ NaviWatch nutzt eine eigene Domain (`navimow_custom`) und **kann parallel** zur 
 
 ## Usage 🎮
 
-Nach dem Einrichten (OAuth2-Login mit deinem Segway-Account) siehst du:
+Nach dem Einrichten (OAuth2-Login mit deinem Segway-Account) bekommst du ein Gerät mit folgenden Entitäten:
 
-* Eine `lawn_mower`-Entity (Start/Pause/Dock)
-* Einen Akku-`sensor`
-* Einen `binary_sensor` für den MQTT-Verbindungsstatus
+| Entität | Wofür |
+|---|---|
+| `lawn_mower` | Die Haupt-Entity. State ist einer von `mowing`, `paused`, `returning`, `docked`, `error`. Unterstützt Start/Pause/Dock. Diagnose-Attribute (`raw_state`, `mqtt_connected`, `last_rest_update`, `last_mqtt_update`) zeigen, ob der Watchdog aktiv ist. |
+| Akku-`sensor` | Batteriestand in Prozent. |
+| MQTT-Verbindung `binary_sensor` (Diagnose) | Ob der schnelle MQTT-Push-Pfad gerade verbunden ist. Kein Hinweis auf generelle Erreichbarkeit — der REST-Poll hält die Haupt-Entity unabhängig davon aktuell. |
+| Zone-`sensor` | Aktuelle physische Mäh-Zone/Partition-ID. Das ist eine **interne, von Segways Backend vergebene ID**, nicht identisch mit den "Zone 1"/"Zone 2"-Bezeichnungen in der App (live bestätigt: zwei echte Zonen zeigten die IDs `9` und `4`). Attribute: `target_zone` (bei Mähstart gewählte Zone), `task_delay` (Regen-/Zeitplan-Verzögerung). |
+| Mähfortschritt-`sensor` | Routen-Fortschritt der aktuellen Aufgabe, 0–100 % (keine Flächenabdeckung). Live bestätigt: stimmt exakt mit dem in der offiziellen App angezeigten Prozentwert überein. |
+| Position X / Position Y `sensor` | Lokale kartesische Koordinaten in Metern, relativ zur Ladestation — **kein GPS**. Nützlich für eigene Automationen, z. B. selbst definierte Teilbereiche oder Erkennung, ob sich der Mäher länger nicht bewegt hat. |
+| Abstand zur Ladestation `sensor` | Abgeleitete (`sqrt(x² + y²)`) Luftlinien-Entfernung von der Ladestation in Metern. Dient nebenbei als Stillstands-/Freeze-Signal — ein unveränderter Wert trotz `state=mowing` ist verdächtig. |
+| Blickrichtung `sensor` | Aktuelle Ausrichtung des Mähers in Grad (0–360°). Bezieht sich auf dasselbe lokale Koordinatensystem wie Position X/Y — kein Kompass. |
+
+**Zone, Mähfortschritt, Position, Abstand und Blickrichtung stammen alle aus einem undokumentierten MQTT-Kanal**, gefunden durch Einsicht in den Quellcode eines Drittanbieter-Forks, nicht aus der offiziellen API — siehe [Bekannte Risiken](#bekannte-risiken--das-könnte-kaputtgehen-und-liegt-nicht-in-meiner-hand-) dazu, was das für die langfristige Zuverlässigkeit bedeutet.
 
 Das Poll-Intervall lässt sich über die Integrations-Optionen anpassen.
 
