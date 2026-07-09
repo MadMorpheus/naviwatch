@@ -41,6 +41,15 @@
       },
       "mow_progress": {
         "name": "Mähfortschritt"
+      },
+      "position_x": {
+        "name": "Position X"
+      },
+      "position_y": {
+        "name": "Position Y"
+      },
+      "dock_distance": {
+        "name": "Abstand zur Ladestation"
       }
     },
     "binary_sensor": {

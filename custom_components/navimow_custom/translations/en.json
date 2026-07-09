@@ -41,6 +41,15 @@
       },
       "mow_progress": {
         "name": "Mowing progress"
+      },
+      "position_x": {
+        "name": "Position X"
+      },
+      "position_y": {
+        "name": "Position Y"
+      },
+      "dock_distance": {
+        "name": "Distance from dock"
       }
     },
     "binary_sensor": {
