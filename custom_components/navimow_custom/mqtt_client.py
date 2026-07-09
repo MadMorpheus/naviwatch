@@ -55,6 +55,12 @@ class NavimowMqttClient:
         self._access_token: str | None = None
         self._client: mqtt_client.Client | None = None
         self.is_connected = False
+        # Verhindert, dass ein stuendlicher Watchdog-Reconnect (force_reconnect) und die
+        # ebenfalls stuendliche OAuth-Token-Rotation (update_credentials) gleichzeitig eigene,
+        # konkurrierende connect()-Ablaeufe starten und sich gegenseitig self._client
+        # ueberschreiben (live beobachtet 2026-07-09: REST-Poll blieb danach dauerhaft stehen,
+        # ohne sich selbst zu erholen - vermutlich genau diese Race Condition).
+        self._connect_lock = asyncio.Lock()
 
     def configure(
         self,
@@ -94,6 +100,11 @@ class NavimowMqttClient:
         return client
 
     async def connect(self) -> None:
+        async with self._connect_lock:
+            await self._connect_locked()
+
+    async def _connect_locked(self) -> None:
+        """Eigentlicher Verbindungsaufbau - Aufrufer muss self._connect_lock bereits halten."""
         if not self._host:
             raise RuntimeError("configure() muss vor connect() aufgerufen werden")
         # _build_client() ruft intern client.tls_set() auf, das synchron Zertifikatsspeicher
@@ -117,8 +128,9 @@ class NavimowMqttClient:
         aufbauen statt nur reconnect() aufzurufen (uebernommen aus mower_sdk-Kommentaren).
         """
         _LOGGER.info("Navimow MQTT: erzwungener Reconnect (Watchdog-Diskrepanz erkannt)")
-        self.disconnect()
-        await self.connect()
+        async with self._connect_lock:
+            self.disconnect()
+            await self._connect_locked()
 
     async def update_credentials(
         self,
@@ -147,11 +159,12 @@ class NavimowMqttClient:
             changed = True
         if not changed:
             return
-        if self._client is not None and self._client.is_connected():
-            _LOGGER.debug("Navimow MQTT credentials updated, wird beim naechsten Reconnect uebernommen")
-            return
-        _LOGGER.debug("Navimow MQTT credentials updated waehrend getrennt, baue Client neu auf")
-        await self.connect()
+        async with self._connect_lock:
+            if self._client is not None and self._client.is_connected():
+                _LOGGER.debug("Navimow MQTT credentials updated, wird beim naechsten Reconnect uebernommen")
+                return
+            _LOGGER.debug("Navimow MQTT credentials updated waehrend getrennt, baue Client neu auf")
+            await self._connect_locked()
 
     def _subscribe_all(self, client: mqtt_client.Client) -> None:
         # "location" ist nicht Teil des offiziellen SDK-Kanalsatzes, liefert aber laut
