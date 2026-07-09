@@ -26,7 +26,12 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .api import NavimowApiClient, NavimowApiError
-from .const import DOMAIN, REST_POLL_INTERVAL, WATCHDOG_RECONNECT_DEBOUNCE
+from .const import (
+    COORDINATOR_UPDATE_TIMEOUT,
+    DOMAIN,
+    REST_POLL_INTERVAL,
+    WATCHDOG_RECONNECT_DEBOUNCE,
+)
 from .location import parse_location_payload
 from .mqtt_client import NavimowMqttClient
 
@@ -245,6 +250,20 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
         )
 
     async def _async_update_data(self) -> NavimowData:
+        # Generelles Zeitlimit um den GESAMTEN Zyklus (REST-Call + ggf. Watchdog-Reconnect +
+        # Credential-Refresh) - live beobachtet, dass dieser trotz Einzel-Timeouts (siehe
+        # api.py) noch dauerhaft haengen blieb. Damit bekommt der Coordinator garantiert nach
+        # spaetestens COORDINATOR_UPDATE_TIMEOUT ein Ergebnis (Erfolg oder Fehler), egal was im
+        # Detail haengt - kein dauerhaftes Einfrieren mehr moeglich.
+        try:
+            async with asyncio.timeout(COORDINATOR_UPDATE_TIMEOUT):
+                return await self._async_update_data_impl()
+        except TimeoutError as err:
+            raise UpdateFailed(
+                f"Navimow-Update haengt seit ueber {COORDINATOR_UPDATE_TIMEOUT}s fest, abgebrochen"
+            ) from err
+
+    async def _async_update_data_impl(self) -> NavimowData:
         if not self.device_id:
             raise UpdateFailed("Kein Navimow-Geraet konfiguriert")
 

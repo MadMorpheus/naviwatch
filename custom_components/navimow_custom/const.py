@@ -23,6 +23,14 @@ API_BASE_URL: Final = "https://navimow-fra.ninebot.com"
 # Cloud-API, verhindert aber ein dauerhaftes Einfrieren.
 REST_REQUEST_TIMEOUT: Final = 30
 
+# Live beobachtet 2026-07-09: der komplette Update-Zyklus (REST-Call + ggf. Watchdog-Reconnect
+# + Credential-Refresh) blieb trotz Request-Timeout ein weiteres Mal dauerhaft stehen, diesmal
+# zeitgleich mit einem Reconnect - Ursache nicht abschliessend geklärt (vermutlich eine
+# subtile Interaktion zwischen dem MQTT-Reconnect-Callback und HAs Poll-Terminplanung).
+# Genereller Schutz: der GESAMTE Zyklus bekommt ein hartes Zeitlimit, damit der Coordinator
+# so oder so nach jedem Intervall ein Ergebnis bekommt statt fuer immer zu haengen.
+COORDINATOR_UPDATE_TIMEOUT: Final = 60
+
 # REST-Poll-Intervall: dient als Ziel-2-Fallback UND als Ziel-1-Watchdog-Grundlage (Abgleich
 # gegen den zuletzt per MQTT bekannten Zustand). MQTT liefert Zustandswechsel typischerweise
 # innerhalb von Sekunden (live verifiziert) - der Poll ist die Sicherheitsnetz-Frequenz, kein
