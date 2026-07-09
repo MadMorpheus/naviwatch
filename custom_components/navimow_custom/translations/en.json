@@ -35,6 +35,24 @@
     "sensor": {
       "battery": {
         "name": "Battery"
+      },
+      "zone": {
+        "name": "Zone"
+      },
+      "mow_progress": {
+        "name": "Mowing progress"
+      },
+      "position_x": {
+        "name": "Position X"
+      },
+      "position_y": {
+        "name": "Position Y"
+      },
+      "dock_distance": {
+        "name": "Distance from dock"
+      },
+      "heading": {
+        "name": "Heading"
       }
     },
     "binary_sensor": {

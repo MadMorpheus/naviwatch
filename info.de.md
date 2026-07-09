@@ -16,13 +16,9 @@ Bestehende Community-Integrationen frieren nach ca. einer Stunde reproduzierbar 
 - `lawn_mower`-Entity: Start, Pause, Dock
 - Akku-Sensor
 - MQTT-Verbindungsstatus als Diagnose-Sensor
+- Zone, Routen-Fortschritt (0–100 %), Position (X/Y in Metern), Blickrichtung und Abstand zur Ladestation — über einen undokumentierten MQTT-Kanal (siehe Bekannte Risiken)
 - Hybrid aus REST-Poll (Ground Truth) und MQTT-Push (Updates innerhalb von Sekunden)
 - Eigenes Icon/Logo, Deutsch/Englisch übersetzt
-
-## Was diese Integration (bisher) NICHT kann
-
-- **Keine Positions-/Kartendaten (Zonen)** — nach ausführlichem Live-Test über REST und alle bekannten MQTT-Kanäle nicht erreichbar
-- **Kein Mähfortschritt/Restzeit** — kein entsprechendes Feld in irgendeiner beobachteten API-Antwort
 
 ## Voraussetzungen
 
@@ -42,6 +38,10 @@ Nutzt intern die Domain `navimow_custom` und kann daher parallel zu anderen Navi
 ## Schon eine andere Navimow-Integration installiert?
 
 Kein Konflikt — NaviWatch nutzt eine eigene Domain und kann parallel zu `NavimowHA` (oder Forks) laufen. Beide behalten zum Vergleichen, oder die andere später entfernen (Einstellungen → Geräte & Dienste → Löschen), sobald du umgestiegen bist. Details in der [README](README.de.md#schon-eine-andere-navimow-integration-installiert-).
+
+## Bekannte Risiken ⚠️
+
+Unabhängiges Hobbyprojekt, keine Partnerschaft mit Segway — keine Garantie auf API-Stabilität. Größtes Risiko: Segway ändert etwas am Backend (besonders am undokumentierten Zonen-/Fortschritts-MQTT-Kanal), und die Integration würde dann still ausfallen, bis es jemand bemerkt und behebt. Vollständige Auflistung in der [README](README.de.md#bekannte-risiken--das-könnte-kaputtgehen-und-liegt-nicht-in-meiner-hand-).
 
 ---
 

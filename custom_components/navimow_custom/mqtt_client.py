@@ -39,7 +39,7 @@ class NavimowMqttClient:
     def __init__(
         self,
         loop: asyncio.AbstractEventLoop,
-        on_message: Callable[[str, dict[str, Any]], None],
+        on_message: Callable[[str, Any, str], None],
         on_connection_changed: Callable[[bool], None] | None = None,
     ) -> None:
         self._loop = loop
@@ -55,6 +55,12 @@ class NavimowMqttClient:
         self._access_token: str | None = None
         self._client: mqtt_client.Client | None = None
         self.is_connected = False
+        # Verhindert, dass ein stuendlicher Watchdog-Reconnect (force_reconnect) und die
+        # ebenfalls stuendliche OAuth-Token-Rotation (update_credentials) gleichzeitig eigene,
+        # konkurrierende connect()-Ablaeufe starten und sich gegenseitig self._client
+        # ueberschreiben (live beobachtet 2026-07-09: REST-Poll blieb danach dauerhaft stehen,
+        # ohne sich selbst zu erholen - vermutlich genau diese Race Condition).
+        self._connect_lock = asyncio.Lock()
 
     def configure(
         self,
@@ -94,6 +100,11 @@ class NavimowMqttClient:
         return client
 
     async def connect(self) -> None:
+        async with self._connect_lock:
+            await self._connect_locked()
+
+    async def _connect_locked(self) -> None:
+        """Eigentlicher Verbindungsaufbau - Aufrufer muss self._connect_lock bereits halten."""
         if not self._host:
             raise RuntimeError("configure() muss vor connect() aufgerufen werden")
         # _build_client() ruft intern client.tls_set() auf, das synchron Zertifikatsspeicher
@@ -104,11 +115,22 @@ class NavimowMqttClient:
         self._client.connect_async(self._host, self._port, MQTT_KEEPALIVE_SECONDS)
         self._client.loop_start()
 
-    def disconnect(self) -> None:
-        if self._client:
-            self._client.loop_stop()
-            self._client.disconnect()
+    async def disconnect(self) -> None:
+        # loop_stop() wartet laut paho-Doku, bis der Netzwerk-Thread sich beendet hat - haengt
+        # dieser Thread selbst fest (z.B. blockierender Socket-Read), blockiert ein synchroner
+        # Aufruf hier den GESAMTEN HA-Event-Loop, nicht nur diese Coroutine. Live beobachtet
+        # 2026-07-09: genau das erklaert, warum selbst ein asyncio.timeout() um den Coordinator-
+        # Zyklus nicht half - ein blockierter Event-Loop kann keine Timeouts mehr auswerten.
+        # Deshalb wie _build_client() im Executor-Thread ausfuehren.
+        client = self._client
+        if client is not None:
+            await self._loop.run_in_executor(None, self._disconnect_client, client)
         self.is_connected = False
+
+    @staticmethod
+    def _disconnect_client(client: mqtt_client.Client) -> None:
+        client.loop_stop()
+        client.disconnect()
 
     async def force_reconnect(self) -> None:
         """Fuer den Watchdog: erzwungener Neuaufbau, wenn REST-Poll eine Diskrepanz zeigt.
@@ -117,8 +139,9 @@ class NavimowMqttClient:
         aufbauen statt nur reconnect() aufzurufen (uebernommen aus mower_sdk-Kommentaren).
         """
         _LOGGER.info("Navimow MQTT: erzwungener Reconnect (Watchdog-Diskrepanz erkannt)")
-        self.disconnect()
-        await self.connect()
+        async with self._connect_lock:
+            await self.disconnect()
+            await self._connect_locked()
 
     async def update_credentials(
         self,
@@ -147,14 +170,18 @@ class NavimowMqttClient:
             changed = True
         if not changed:
             return
-        if self._client is not None and self._client.is_connected():
-            _LOGGER.debug("Navimow MQTT credentials updated, wird beim naechsten Reconnect uebernommen")
-            return
-        _LOGGER.debug("Navimow MQTT credentials updated waehrend getrennt, baue Client neu auf")
-        await self.connect()
+        async with self._connect_lock:
+            if self._client is not None and self._client.is_connected():
+                _LOGGER.debug("Navimow MQTT credentials updated, wird beim naechsten Reconnect uebernommen")
+                return
+            _LOGGER.debug("Navimow MQTT credentials updated waehrend getrennt, baue Client neu auf")
+            await self._connect_locked()
 
     def _subscribe_all(self, client: mqtt_client.Client) -> None:
-        channels = ("state", "event", "attributes")
+        # "location" ist nicht Teil des offiziellen SDK-Kanalsatzes, liefert aber laut
+        # oeffentlich einsehbarem Fork-Code (pgoutsos/NavimowHA) Position/Zone/Fortschritt -
+        # noch nicht selbst live verifiziert (siehe location.py, dokumentation/sdk-notizen.md).
+        channels = ("state", "event", "attributes", "location")
         if not self._device_ids:
             for channel in channels:
                 client.subscribe(f"/downlink/vehicle/+/realtimeDate/{channel}")
@@ -196,7 +223,10 @@ class NavimowMqttClient:
         except (UnicodeDecodeError, ValueError):
             _LOGGER.debug("Navimow MQTT payload not JSON: topic=%s", msg.topic)
             return
-        if not isinstance(payload, dict):
+        # state/event/attributes liefern ein JSON-Objekt, location ein JSON-Array (siehe
+        # location.py) - beide Formen durchreichen, alles andere verwerfen.
+        if not isinstance(payload, (dict, list)):
             return
-        payload.setdefault("device_id", device_id)
-        self._loop.call_soon_threadsafe(self._on_message, msg.topic, payload)
+        if isinstance(payload, dict):
+            payload.setdefault("device_id", device_id)
+        self._loop.call_soon_threadsafe(self._on_message, msg.topic, payload, device_id)

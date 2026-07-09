@@ -35,6 +35,24 @@
     "sensor": {
       "battery": {
         "name": "Akku"
+      },
+      "zone": {
+        "name": "Zone"
+      },
+      "mow_progress": {
+        "name": "Mähfortschritt"
+      },
+      "position_x": {
+        "name": "Position X"
+      },
+      "position_y": {
+        "name": "Position Y"
+      },
+      "dock_distance": {
+        "name": "Abstand zur Ladestation"
+      },
+      "heading": {
+        "name": "Blickrichtung"
       }
     },
     "binary_sensor": {

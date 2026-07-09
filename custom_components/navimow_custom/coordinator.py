@@ -26,7 +26,13 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .api import NavimowApiClient, NavimowApiError
-from .const import DOMAIN, REST_POLL_INTERVAL, WATCHDOG_RECONNECT_DEBOUNCE
+from .const import (
+    COORDINATOR_UPDATE_TIMEOUT,
+    DOMAIN,
+    REST_POLL_INTERVAL,
+    WATCHDOG_RECONNECT_DEBOUNCE,
+)
+from .location import parse_location_payload
 from .mqtt_client import NavimowMqttClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -86,6 +92,15 @@ class NavimowData:
     mqtt_connected: bool
     last_rest_update: datetime
     last_mqtt_update: datetime | None
+    # Ueber den undokumentierten "location"-Kanal (siehe location.py) - noch nicht live
+    # verifiziert, daher alle optional/None solange keine Nachricht empfangen wurde.
+    pos_x: float | None = None
+    pos_y: float | None = None
+    pos_theta: float | None = None
+    zone: int | None = None
+    target_zone: int | None = None
+    mow_progress_pct: int | None = None
+    task_delay: bool | None = None
 
 
 class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
@@ -137,10 +152,22 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
         )
         await self._mqtt.connect()
 
+    def _push_data(self, new_data: NavimowData) -> None:
+        """Entities ueber neue Push-Daten (MQTT) informieren, OHNE den REST-Poll-Zeitplan zu
+        beeinflussen. async_set_updated_data() wuerde das bei jedem Aufruf tun (setzt den
+        naechsten geplanten Poll auf update_interval ab JETZT zurueck) - live beobachtet
+        2026-07-09: bei den alle ~2s eintreffenden "location"-Nachrichten waehrend aktivem
+        Maehen verhungerte der REST-Poll dadurch komplett (Log zeigte "Manually updated ...
+        data" im 2-Sekunden-Takt, nie einen eigenen Fehler). Das war die eigentliche Ursache
+        aller bisherigen "Freezes", nicht ein haengender Call.
+        """
+        self.data = new_data
+        self.async_update_listeners()
+
     def _handle_mqtt_connection_changed(self, connected: bool) -> None:
         self._mqtt_connected = connected
         if self.data is not None:
-            self.async_set_updated_data(replace(self.data, mqtt_connected=connected))
+            self._push_data(replace(self.data, mqtt_connected=connected))
         if not connected:
             # userName/pwdInfo sind an den OAuth-Token gebunden, nicht account-stabil (durch
             # Gegenlesen von NavimowHAs echtem __init__.py bestaetigt: dort explizit noetig,
@@ -162,10 +189,15 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
             access_token=self.api.access_token,
         )
 
-    def _handle_mqtt_message(self, topic: str, payload: dict[str, Any]) -> None:
-        if self.device_id and payload.get("device_id") != self.device_id:
+    def _handle_mqtt_message(self, topic: str, payload: Any, device_id: str) -> None:
+        if self.device_id and device_id != self.device_id:
             return
         channel = topic.rsplit("/", 1)[-1]
+
+        if channel == "location":
+            self._handle_location_message(payload)
+            return
+
         if channel != "state":
             # event/attributes: in ueber 4 Minuten Live-Test (Dock + aktives Maehen) nie
             # beobachtet (siehe sdk-notizen.md) - trotzdem geloggt fuer spaetere Auswertung.
@@ -178,18 +210,72 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
         raw_state = payload.get("state")
         battery = payload.get("battery")
 
-        new_data = NavimowData(
-            device_id=self.device_id or "",
-            state=_canonical_state(raw_state),
-            raw_state=str(raw_state),
-            battery=battery if battery is not None else (current.battery if current else 0),
-            mqtt_connected=self._mqtt_connected,
-            last_rest_update=current.last_rest_update if current else now,
-            last_mqtt_update=now,
+        if current is None:
+            new_data = NavimowData(
+                device_id=self.device_id or "",
+                state=_canonical_state(raw_state),
+                raw_state=str(raw_state),
+                battery=battery if battery is not None else 0,
+                mqtt_connected=self._mqtt_connected,
+                last_rest_update=now,
+                last_mqtt_update=now,
+            )
+        else:
+            # replace() statt Neubau, damit per "location"-Kanal bekannte Position/Zone
+            # (siehe _handle_location_message) hier nicht verworfen werden.
+            new_data = replace(
+                current,
+                state=_canonical_state(raw_state),
+                raw_state=str(raw_state),
+                battery=battery if battery is not None else current.battery,
+                mqtt_connected=self._mqtt_connected,
+                last_mqtt_update=now,
+            )
+        self._push_data(new_data)
+
+    def _handle_location_message(self, payload: Any) -> None:
+        """Undokumentierter 'location'-Kanal, siehe location.py - noch nicht live verifiziert."""
+        update = parse_location_payload(payload)
+        if update is None:
+            return
+        current = self.data
+        if current is None:
+            # Vor dem ersten REST-Poll gibt es noch kein NavimowData zum Mergen - seltener
+            # Fall (Location-Nachricht kaeme vor der allerersten Coordinator-Aktualisierung),
+            # wird beim naechsten Poll/State-Update nachgeholt.
+            return
+        self._push_data(
+            replace(
+                current,
+                pos_x=update.pos_x if update.pos_x is not None else current.pos_x,
+                pos_y=update.pos_y if update.pos_y is not None else current.pos_y,
+                pos_theta=update.pos_theta if update.pos_theta is not None else current.pos_theta,
+                zone=update.zone if update.zone is not None else current.zone,
+                target_zone=update.target_zone if update.target_zone is not None else current.target_zone,
+                mow_progress_pct=(
+                    update.mow_progress_pct
+                    if update.mow_progress_pct is not None
+                    else current.mow_progress_pct
+                ),
+                task_delay=update.task_delay if update.task_delay is not None else current.task_delay,
+            )
         )
-        self.async_set_updated_data(new_data)
 
     async def _async_update_data(self) -> NavimowData:
+        # Generelles Zeitlimit um den GESAMTEN Zyklus (REST-Call + ggf. Watchdog-Reconnect +
+        # Credential-Refresh) - live beobachtet, dass dieser trotz Einzel-Timeouts (siehe
+        # api.py) noch dauerhaft haengen blieb. Damit bekommt der Coordinator garantiert nach
+        # spaetestens COORDINATOR_UPDATE_TIMEOUT ein Ergebnis (Erfolg oder Fehler), egal was im
+        # Detail haengt - kein dauerhaftes Einfrieren mehr moeglich.
+        try:
+            async with asyncio.timeout(COORDINATOR_UPDATE_TIMEOUT):
+                return await self._async_update_data_impl()
+        except TimeoutError as err:
+            raise UpdateFailed(
+                f"Navimow-Update haengt seit ueber {COORDINATOR_UPDATE_TIMEOUT}s fest, abgebrochen"
+            ) from err
+
+    async def _async_update_data_impl(self) -> NavimowData:
         if not self.device_id:
             raise UpdateFailed("Kein Navimow-Geraet konfiguriert")
 
@@ -239,7 +325,20 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
         if self._mqtt is not None:
             await self._mqtt.update_credentials(access_token=self.api.access_token)
 
-        return NavimowData(
+        if current is None:
+            return NavimowData(
+                device_id=self.device_id,
+                state=canonical,
+                raw_state=str(raw_state),
+                battery=battery,
+                mqtt_connected=self._mqtt_connected,
+                last_rest_update=now,
+                last_mqtt_update=self._last_mqtt_update,
+            )
+        # replace() statt Neubau, damit per "location"-Kanal bekannte Position/Zone (siehe
+        # _handle_location_message) durch den REST-Poll nicht auf None zurueckgesetzt werden.
+        return replace(
+            current,
             device_id=self.device_id,
             state=canonical,
             raw_state=str(raw_state),
@@ -251,7 +350,7 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
 
     async def async_shutdown(self) -> None:
         if self._mqtt is not None:
-            self._mqtt.disconnect()
+            await self._mqtt.disconnect()
         await super().async_shutdown()
 
     async def async_send_command(self, action: str) -> None:

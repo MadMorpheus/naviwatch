@@ -8,13 +8,14 @@ benachbarten Modulen (cloud.py-Topic-Parsing).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from typing import Any
 
 from homeassistant.helpers import config_entry_oauth2_flow
 
-from .const import API_BASE_URL
+from .const import API_BASE_URL, REST_REQUEST_TIMEOUT
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,9 +48,17 @@ class NavimowApiClient:
     ) -> dict[str, Any]:
         url = f"{API_BASE_URL}{endpoint}"
         headers = {"requestId": str(uuid.uuid4())}
-        response = await self._oauth_session.async_request(method, url, json=json, headers=headers)
-        response.raise_for_status()
-        data: dict[str, Any] = await response.json()
+        try:
+            # Ohne Timeout haengt ein gestockter Request fuer immer, da DataUpdateCoordinator
+            # den naechsten Poll erst nach Abschluss des aktuellen einplant - live beobachtet
+            # 2026-07-09: REST-Poll blieb nach dem allerersten Aufruf ohne jede Fehlermeldung
+            # dauerhaft stehen, vermutlich genau deshalb.
+            async with asyncio.timeout(REST_REQUEST_TIMEOUT):
+                response = await self._oauth_session.async_request(method, url, json=json, headers=headers)
+                response.raise_for_status()
+                data: dict[str, Any] = await response.json()
+        except TimeoutError as err:
+            raise NavimowApiError(f"Navimow API request timed out after {REST_REQUEST_TIMEOUT}s") from err
         if data.get("code") != 1:
             raise NavimowApiError(data.get("desc", "Unknown Navimow API error"), code=data.get("code"))
         return data
