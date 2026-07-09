@@ -19,12 +19,17 @@ from .entity import NavimowEntity
 
 # Kein REST/MQTT-Rohwert kennt "returning" fuer isDocking direkt, sondern nur ueber die
 # in coordinator.py bereits kanonisierten Werte - siehe dortige _RAW_STATE_MAP.
+#
+# "idle" -> PAUSED statt DOCKED: live beobachtet 2026-07-09, dass "isIdel" auch auftritt,
+# waehrend der Maeher manuell mitten im Garten gestoppt wurde (nicht an der Ladestation) -
+# "idle" bedeutet nur "steht still", nicht zwingend "gedockt". HAs LawnMowerActivity kennt
+# kein eigenes IDLE, PAUSED passt semantisch deutlich besser als DOCKED.
 _STATE_TO_ACTIVITY: dict[str, LawnMowerActivity] = {
     "mowing": LawnMowerActivity.MOWING,
     "paused": LawnMowerActivity.PAUSED,
     "returning": LawnMowerActivity.RETURNING,
     "docked": LawnMowerActivity.DOCKED,
-    "idle": LawnMowerActivity.DOCKED,
+    "idle": LawnMowerActivity.PAUSED,
     "error": LawnMowerActivity.ERROR,
 }
 
