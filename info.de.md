@@ -43,6 +43,10 @@ Nutzt intern die Domain `navimow_custom` und kann daher parallel zu anderen Navi
 
 Kein Konflikt — NaviWatch nutzt eine eigene Domain und kann parallel zu `NavimowHA` (oder Forks) laufen. Beide behalten zum Vergleichen, oder die andere später entfernen (Einstellungen → Geräte & Dienste → Löschen), sobald du umgestiegen bist. Details in der [README](README.de.md#schon-eine-andere-navimow-integration-installiert-).
 
+## Bekannte Risiken ⚠️
+
+Unabhängiges Hobbyprojekt, keine Partnerschaft mit Segway — keine Garantie auf API-Stabilität. Größtes Risiko: Segway ändert etwas am Backend (besonders am undokumentierten Zonen-/Fortschritts-MQTT-Kanal), und die Integration würde dann still ausfallen, bis es jemand bemerkt und behebt. Vollständige Auflistung in der [README](README.de.md#bekannte-risiken--das-könnte-kaputtgehen-und-liegt-nicht-in-meiner-hand-).
+
 ---
 
 *Inoffizielle Integration, nicht von Segway/Navimow autorisiert oder unterstützt. Unabhängig entwickelt anhand von Live-Tests gegen die reale API.*

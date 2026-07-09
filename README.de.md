@@ -95,6 +95,18 @@ Das Poll-Intervall lässt sich über die Integrations-Optionen anpassen.
 * Stelle sicher, dass sich dein Account in der offiziellen Navimow-App anmelden lässt — die Integration nutzt denselben OAuth2-Flow.
 * Bei Problemen: Home-Assistant-Logs auf Meldungen von `custom_components.navimow_custom` prüfen und ein Issue mit relevanten Log-Ausschnitten eröffnen: `https://github.com/MadMorpheus/naviwatch/issues`
 
+## Bekannte Risiken — das könnte kaputtgehen, und liegt nicht in meiner Hand ⚠️
+
+Das ist ein unabhängiges, inoffizielles Hobbyprojekt ohne Partnerschaft oder Support-Vereinbarung mit Segway. Ungefähr absteigend nach Wahrscheinlichkeit:
+
+1. **Segway ändert etwas am Backend.** Keine Garantie auf API-Stabilität. Am fragilsten ist der **undokumentierte** MQTT-Kanal `location` (Zonen-/Fortschrittsdaten) — reverse-engineered aus einem Fremd-Fork, kein Teil einer offiziellen API, könnte sich jederzeit ohne Vorwarnung ändern oder verschwinden. Die Kernfunktionen (Status, Akku, Start/Pause/Dock) nutzen dieselben Endpunkte wie die offizielle App — etwas stabiler, aber ebenfalls ohne Garantie.
+2. **Segway rotiert oder sperrt den geteilten OAuth-Client** (`client_id`/`client_secret`, ein "public client", den jede Community-Integration dieser Art nutzt). Falls das je eingeschränkt wird, bräuchten alle inoffiziellen Integrationen — auch diese — neue Zugangsdaten.
+3. **Home-Assistant-Core-Änderungen.** Das OAuth2-Framework oder die `DataUpdateCoordinator`-API könnten sich in einer künftigen Major-Version ändern. HAs Blocking-Call-Detektor wird zudem tendenziell strenger und könnte künftig bisher unbemerkte Probleme aufdecken.
+4. **Änderungen an der `paho-mqtt`-Bibliothek.** Diese Integration nutzt bewusst die ältere `CallbackAPIVersion.VERSION1`-API, die eine künftige Major-Version entfernen könnte.
+5. **Mäher-Firmware-Updates.** Neue oder geänderte `vehicleState`-Werte (es gibt schon einen bekannten Firmware-Tippfehler, `isIdel`) könnten außerhalb der aktuellen Zuordnung liegen.
+
+**Kurz gesagt:** Das ist ein Soloprojekt ohne Herstellerbeziehung und ohne aktives Monitoring seitens Segway. Falls sich stromaufwärts etwas ändert, fällt die Integration vermutlich still aus (Fehler im Log), bis es jemand bemerkt und den Code anpasst — es gibt keine Garantie auf einen Fix, erst recht nicht in einem bestimmten Zeitrahmen.
+
 ## Lizenz
 
 MIT — siehe [`LICENSE`](LICENSE).
