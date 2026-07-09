@@ -17,6 +17,12 @@ CLIENT_SECRET: Final = "57056e15-722e-42be-bbaa-b0cbfb208a52"
 
 API_BASE_URL: Final = "https://navimow-fra.ninebot.com"
 
+# Live beobachtet 2026-07-09: ein REST-Request ohne Timeout kann auf unbestimmte Zeit haengen
+# (kein Fehler, keine Exception) und blockiert damit jeden weiteren Poll, da der Coordinator
+# den naechsten erst nach Abschluss des aktuellen einplant. 30s ist grosszuegig fuer eine
+# Cloud-API, verhindert aber ein dauerhaftes Einfrieren.
+REST_REQUEST_TIMEOUT: Final = 30
+
 # REST-Poll-Intervall: dient als Ziel-2-Fallback UND als Ziel-1-Watchdog-Grundlage (Abgleich
 # gegen den zuletzt per MQTT bekannten Zustand). MQTT liefert Zustandswechsel typischerweise
 # innerhalb von Sekunden (live verifiziert) - der Poll ist die Sicherheitsnetz-Frequenz, kein
