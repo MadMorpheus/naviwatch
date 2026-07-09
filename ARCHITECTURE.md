@@ -1,5 +1,7 @@
 # Architecture
 
+🇬🇧 English | 🇩🇪 [Deutsch](ARCHITECTURE.de.md)
+
 How NaviWatch is built, and — most importantly — how often each entity actually updates and what triggers it.
 
 ## REST poll vs. MQTT push
