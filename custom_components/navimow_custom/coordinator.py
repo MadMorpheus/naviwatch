@@ -152,10 +152,22 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
         )
         await self._mqtt.connect()
 
+    def _push_data(self, new_data: NavimowData) -> None:
+        """Entities ueber neue Push-Daten (MQTT) informieren, OHNE den REST-Poll-Zeitplan zu
+        beeinflussen. async_set_updated_data() wuerde das bei jedem Aufruf tun (setzt den
+        naechsten geplanten Poll auf update_interval ab JETZT zurueck) - live beobachtet
+        2026-07-09: bei den alle ~2s eintreffenden "location"-Nachrichten waehrend aktivem
+        Maehen verhungerte der REST-Poll dadurch komplett (Log zeigte "Manually updated ...
+        data" im 2-Sekunden-Takt, nie einen eigenen Fehler). Das war die eigentliche Ursache
+        aller bisherigen "Freezes", nicht ein haengender Call.
+        """
+        self.data = new_data
+        self.async_update_listeners()
+
     def _handle_mqtt_connection_changed(self, connected: bool) -> None:
         self._mqtt_connected = connected
         if self.data is not None:
-            self.async_set_updated_data(replace(self.data, mqtt_connected=connected))
+            self._push_data(replace(self.data, mqtt_connected=connected))
         if not connected:
             # userName/pwdInfo sind an den OAuth-Token gebunden, nicht account-stabil (durch
             # Gegenlesen von NavimowHAs echtem __init__.py bestaetigt: dort explizit noetig,
@@ -219,7 +231,7 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
                 mqtt_connected=self._mqtt_connected,
                 last_mqtt_update=now,
             )
-        self.async_set_updated_data(new_data)
+        self._push_data(new_data)
 
     def _handle_location_message(self, payload: Any) -> None:
         """Undokumentierter 'location'-Kanal, siehe location.py - noch nicht live verifiziert."""
@@ -232,7 +244,7 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
             # Fall (Location-Nachricht kaeme vor der allerersten Coordinator-Aktualisierung),
             # wird beim naechsten Poll/State-Update nachgeholt.
             return
-        self.async_set_updated_data(
+        self._push_data(
             replace(
                 current,
                 pos_x=update.pos_x if update.pos_x is not None else current.pos_x,
