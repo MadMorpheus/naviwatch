@@ -41,6 +41,8 @@ The stock Segway API/SDK only documents the `state`, `event`, and `attributes` M
 
 Decoding lives in `custom_components/navimow_custom/location.py`.
 
+**Zone/partition IDs are not sequential and not the same as the app's "Zone 1"/"Zone 2" labels** — live-confirmed on a two-zone garden: the zones showed IDs `9` and `4`, not `1`/`2`. There is no known way to derive the ID → app-label mapping other than starting each zone once and observing which ID appears.
+
 ## Why entity updates and the poll schedule are kept separate
 
 Home Assistant's `DataUpdateCoordinator.async_set_updated_data()` is convenient for push updates, but it also resets the coordinator's next-scheduled-poll timer on every call. During active mowing, `location` messages (mostly pose updates) arrive roughly every 2 seconds — calling `async_set_updated_data()` from the message handler would reset the 120-second REST-poll countdown before it could ever elapse, silently starving the REST poll (and with it the watchdog) for as long as the mower kept moving. This was found live (2026-07-09) via `custom_components.navimow_custom: debug` logging, which showed Home Assistant's own `"Manually updated navimow_custom data"` debug line firing every ~2 seconds instead of the expected ~120s poll cadence.

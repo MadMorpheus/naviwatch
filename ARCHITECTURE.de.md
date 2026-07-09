@@ -41,6 +41,8 @@ Die offizielle Segway-API/das SDK dokumentiert nur die Kanäle `state`, `event` 
 
 Die Dekodierung liegt in `custom_components/navimow_custom/location.py`.
 
+**Zone-/Partition-IDs sind nicht fortlaufend und nicht identisch mit den "Zone 1"/"Zone 2"-Bezeichnungen der App** — live bestätigt an einem Zwei-Zonen-Garten: die Zonen zeigten die IDs `9` und `4`, nicht `1`/`2`. Es gibt keinen bekannten Weg, die Zuordnung ID → App-Bezeichnung herzuleiten, außer jede Zone einmal zu starten und zu beobachten, welche ID erscheint.
+
 ## Warum Entity-Updates und der Poll-Zeitplan getrennt gehalten werden
 
 Home Assistants `DataUpdateCoordinator.async_set_updated_data()` ist praktisch für Push-Updates, setzt aber bei jedem Aufruf auch den Timer für den nächsten geplanten Poll zurück. Während aktivem Mähen treffen `location`-Nachrichten (meist Pose-Updates) etwa alle 2 Sekunden ein — ein Aufruf von `async_set_updated_data()` aus dem Nachrichten-Handler würde den 120-Sekunden-REST-Poll-Countdown zurücksetzen, bevor er je ablaufen könnte, und den REST-Poll (und damit den Watchdog) stillschweigend verhungern lassen, solange sich der Mäher bewegte. Das wurde live (2026-07-09) über `custom_components.navimow_custom: debug`-Logging gefunden, das Home Assistants eigene Debug-Zeile „Manually updated navimow_custom data" im 2-Sekunden-Takt zeigte, statt der erwarteten ~120s-Poll-Kadenz.
