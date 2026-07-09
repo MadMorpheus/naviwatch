@@ -50,6 +50,9 @@
       },
       "dock_distance": {
         "name": "Abstand zur Ladestation"
+      },
+      "heading": {
+        "name": "Blickrichtung"
       }
     },
     "binary_sensor": {

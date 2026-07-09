@@ -50,6 +50,9 @@
       },
       "dock_distance": {
         "name": "Distance from dock"
+      },
+      "heading": {
+        "name": "Heading"
       }
     },
     "binary_sensor": {

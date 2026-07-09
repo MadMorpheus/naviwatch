@@ -27,6 +27,7 @@ async def async_setup_entry(
             NavimowPositionXSensor(coordinator),
             NavimowPositionYSensor(coordinator),
             NavimowDockDistanceSensor(coordinator),
+            NavimowHeadingSensor(coordinator),
         ]
     )
 
@@ -167,3 +168,26 @@ class NavimowDockDistanceSensor(NavimowEntity, SensorEntity):
         if data is None or data.pos_x is None or data.pos_y is None:
             return None
         return round(math.sqrt(data.pos_x**2 + data.pos_y**2), 2)
+
+
+class NavimowHeadingSensor(NavimowEntity, SensorEntity):
+    """Blickrichtung des Maehers in Grad (0-360), umgerechnet aus 'postureTheta' (Radiant).
+
+    Kein Kompass - relativ zum selben lokalen Koordinatensystem wie position_x/position_y
+    (Ursprung/Ausrichtung an der Ladestation), siehe location.py.
+    """
+
+    _attr_translation_key = "heading"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = "°"
+
+    def __init__(self, coordinator: NavimowCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.device_id}_heading"
+
+    @property
+    def native_value(self) -> float | None:
+        data = self.coordinator.data
+        if data is None or data.pos_theta is None:
+            return None
+        return round(math.degrees(data.pos_theta) % 360, 1)
