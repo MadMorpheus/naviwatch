@@ -115,11 +115,22 @@ class NavimowMqttClient:
         self._client.connect_async(self._host, self._port, MQTT_KEEPALIVE_SECONDS)
         self._client.loop_start()
 
-    def disconnect(self) -> None:
-        if self._client:
-            self._client.loop_stop()
-            self._client.disconnect()
+    async def disconnect(self) -> None:
+        # loop_stop() wartet laut paho-Doku, bis der Netzwerk-Thread sich beendet hat - haengt
+        # dieser Thread selbst fest (z.B. blockierender Socket-Read), blockiert ein synchroner
+        # Aufruf hier den GESAMTEN HA-Event-Loop, nicht nur diese Coroutine. Live beobachtet
+        # 2026-07-09: genau das erklaert, warum selbst ein asyncio.timeout() um den Coordinator-
+        # Zyklus nicht half - ein blockierter Event-Loop kann keine Timeouts mehr auswerten.
+        # Deshalb wie _build_client() im Executor-Thread ausfuehren.
+        client = self._client
+        if client is not None:
+            await self._loop.run_in_executor(None, self._disconnect_client, client)
         self.is_connected = False
+
+    @staticmethod
+    def _disconnect_client(client: mqtt_client.Client) -> None:
+        client.loop_stop()
+        client.disconnect()
 
     async def force_reconnect(self) -> None:
         """Fuer den Watchdog: erzwungener Neuaufbau, wenn REST-Poll eine Diskrepanz zeigt.
@@ -129,7 +140,7 @@ class NavimowMqttClient:
         """
         _LOGGER.info("Navimow MQTT: erzwungener Reconnect (Watchdog-Diskrepanz erkannt)")
         async with self._connect_lock:
-            self.disconnect()
+            await self.disconnect()
             await self._connect_locked()
 
     async def update_credentials(

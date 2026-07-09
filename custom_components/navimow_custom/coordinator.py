@@ -338,7 +338,7 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
 
     async def async_shutdown(self) -> None:
         if self._mqtt is not None:
-            self._mqtt.disconnect()
+            await self._mqtt.disconnect()
         await super().async_shutdown()
 
     async def async_send_command(self, action: str) -> None:
