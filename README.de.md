@@ -89,6 +89,8 @@ Nach dem Einrichten (OAuth2-Login mit deinem Segway-Account) siehst du:
 
 Das Poll-Intervall lässt sich über die Integrations-Optionen anpassen.
 
+Interessiert, wann/wie oft genau welche Entität aktualisiert wird? Siehe [ARCHITECTURE.md](ARCHITECTURE.md) (Englisch).
+
 ## Troubleshooting 🔧
 
 * Zeigt der Watchdog wiederholt Reconnects in den Logs (`Navimow Watchdog: ...`)? Das ist normales Verhalten bei einem echten Zustandswechsel — bei anhaltend gleichem Mismatch greift ein 5-Minuten-Debounce, damit nicht unnötig wiederholt reconnectet wird.
