@@ -36,16 +36,16 @@ Bestehende Community-Integrationen frieren nach ca. einer Stunde reproduzierbar 
 * Hybrid aus REST-Poll (Ground Truth) und MQTT-Push
 * MQTT-Updates reagieren innerhalb von Sekunden auf echte Zustandswechsel
 
+### Zone, Fortschritt & Position 🗺️
+
+* Aktuelle Mäh-Zone, Routen-Fortschritt (0–100 %, live bestätigt exakt übereinstimmend mit der offiziellen App), Position (lokale X/Y-Koordinaten in Metern), Blickrichtung und Abstand zur Ladestation
+* Stammt aus einem undokumentierten MQTT-Kanal, gefunden durch Einsicht in den Quellcode eines Drittanbieter-Forks — siehe [Bekannte Risiken](#bekannte-risiken--das-könnte-kaputtgehen-und-liegt-nicht-in-meiner-hand-)
+
 ### Native Home Assistant Integration
 
 * Native `lawn_mower`-Entity, volle Automations-Kompatibilität
 * Eigenes Brand-Icon/Logo
 * Übersetzt: Deutsch, Englisch
-
-## Was diese Integration (bisher) NICHT kann
-
-* **Keine Positions-/Kartendaten (Zonen)** — nach ausführlichem Live-Test über REST und alle bekannten MQTT-Kanäle nicht erreichbar
-* **Kein Mähfortschritt/Restzeit** — kein entsprechendes Feld in irgendeiner beobachteten API-Antwort
 
 ## Prerequisites 📋
 

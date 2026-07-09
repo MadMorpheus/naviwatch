@@ -36,16 +36,16 @@ Existing community integrations reproducibly freeze after about an hour and don'
 * Hybrid of REST polling (ground truth) and MQTT push
 * MQTT updates react within seconds to real state changes
 
+### Zone, Progress & Position 🗺️
+
+* Current mowing zone, route progress (0–100%, confirmed to match the official app exactly), position (local X/Y in meters), heading, and distance from dock
+* Sourced from an undocumented MQTT channel found by inspecting a third-party fork's source code — see [Known risks](#known-risks--this-could-break-and-its-not-in-my-hands-)
+
 ### Native Home Assistant Integration
 
 * Native `lawn_mower` entity, full automation compatibility
 * Own brand icon/logo
 * Translated: English, German
-
-## What this integration can't (yet) do
-
-* **No position/map data (zones)** — not reachable after extensive live testing across REST and all known MQTT channels
-* **No mowing progress/remaining time** — no corresponding field in any observed API response
 
 ## Prerequisites 📋
 

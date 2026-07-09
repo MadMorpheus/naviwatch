@@ -16,13 +16,9 @@ Existing community integrations reproducibly freeze after about an hour and don'
 - `lawn_mower` entity: start, pause, dock
 - Battery sensor
 - MQTT connection status as a diagnostic sensor
+- Zone, route progress (0–100%), position (X/Y in meters), heading, and distance from dock — from an undocumented MQTT channel (see Known risks)
 - Hybrid of REST polling (ground truth) and MQTT push (updates within seconds)
 - Own icon/logo, translated to English/German
-
-## What this integration can't (yet) do
-
-- **No position/map data (zones)** — not reachable after extensive live testing across REST and all known MQTT channels
-- **No mowing progress/remaining time** — no corresponding field in any observed API response
 
 ## Prerequisites
 

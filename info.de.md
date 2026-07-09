@@ -16,13 +16,9 @@ Bestehende Community-Integrationen frieren nach ca. einer Stunde reproduzierbar 
 - `lawn_mower`-Entity: Start, Pause, Dock
 - Akku-Sensor
 - MQTT-Verbindungsstatus als Diagnose-Sensor
+- Zone, Routen-Fortschritt (0–100 %), Position (X/Y in Metern), Blickrichtung und Abstand zur Ladestation — über einen undokumentierten MQTT-Kanal (siehe Bekannte Risiken)
 - Hybrid aus REST-Poll (Ground Truth) und MQTT-Push (Updates innerhalb von Sekunden)
 - Eigenes Icon/Logo, Deutsch/Englisch übersetzt
-
-## Was diese Integration (bisher) NICHT kann
-
-- **Keine Positions-/Kartendaten (Zonen)** — nach ausführlichem Live-Test über REST und alle bekannten MQTT-Kanäle nicht erreichbar
-- **Kein Mähfortschritt/Restzeit** — kein entsprechendes Feld in irgendeiner beobachteten API-Antwort
 
 ## Voraussetzungen
 
