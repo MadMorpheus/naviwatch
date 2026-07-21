@@ -1,0 +1,64 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "Välj autentiseringsmetod"
+      },
+      "reauth_confirm": {
+        "title": "Återautentisera Navimow",
+        "description": "Segway login har upphört att gälla eller blivit återkallad. Vänligen logga in igen."
+      }
+    },
+    "abort": {
+      "already_configured": "Enheten är redan konfigurerad",
+      "missing_config": "OAuth2-konfiguration saknas",
+      "reauth_successful": "Återautentisering lyckades",
+      "oauth_error": "Fel vid hämtning av access token",
+      "oauth_timeout": "Tidsgräns överskriden under autentisering",
+      "oauth_unauthorized": "OAuth2-autentisering misslyckades"
+    },
+    "create_entry": {
+      "default": "Lyckades autentisera med Segway"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Navimow val",
+        "data": {
+          "poll_interval_seconds": "REST pollnings-interval (sekunder)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "battery": {
+        "name": "Batteri"
+      },
+      "zone": {
+        "name": "Zon"
+      },
+      "mow_progress": {
+        "name": "Klippningsstatus"
+      },
+      "position_x": {
+        "name": "Position X"
+      },
+      "position_y": {
+        "name": "Position Y"
+      },
+      "dock_distance": {
+        "name": "Avstånd till dockningsstation"
+      },
+      "heading": {
+        "name": "Riktning"
+      }
+    },
+    "binary_sensor": {
+      "mqtt_connected": {
+        "name": "MQTT ansluten"
+      }
+    }
+  }
+}
