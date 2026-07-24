@@ -55,6 +55,10 @@ class NavimowMqttClient:
         self._access_token: str | None = None
         self._client: mqtt_client.Client | None = None
         self.is_connected = False
+        # mid (message id von client.subscribe()) -> Topic, nur um on_subscribe-Antworten
+        # (SUBACK) im Log dem jeweiligen Kanal zuordnen zu koennen. Wird pro Eintrag beim
+        # Empfang der Bestaetigung wieder entfernt.
+        self._pending_subscriptions: dict[int, str] = {}
         # Verhindert, dass ein stuendlicher Watchdog-Reconnect (force_reconnect) und die
         # ebenfalls stuendliche OAuth-Token-Rotation (update_credentials) gleichzeitig eigene,
         # konkurrierende connect()-Ablaeufe starten und sich gegenseitig self._client
@@ -97,6 +101,7 @@ class NavimowMqttClient:
         client.on_connect = self._on_connect
         client.on_disconnect = self._on_disconnect
         client.on_message = self._on_mqtt_message
+        client.on_subscribe = self._on_subscribe
         return client
 
     async def connect(self) -> None:
@@ -184,11 +189,17 @@ class NavimowMqttClient:
         channels = ("state", "event", "attributes", "location")
         if not self._device_ids:
             for channel in channels:
-                client.subscribe(f"/downlink/vehicle/+/realtimeDate/{channel}")
+                topic = f"/downlink/vehicle/+/realtimeDate/{channel}"
+                self._subscribe_and_track(client, topic)
             return
         for device_id in self._device_ids:
             for channel in channels:
-                client.subscribe(f"/downlink/vehicle/{device_id}/realtimeDate/{channel}")
+                topic = f"/downlink/vehicle/{device_id}/realtimeDate/{channel}"
+                self._subscribe_and_track(client, topic)
+
+    def _subscribe_and_track(self, client: mqtt_client.Client, topic: str) -> None:
+        _result, mid = client.subscribe(topic)
+        self._pending_subscriptions[mid] = topic
 
     def _on_connect(self, client: mqtt_client.Client, _userdata: Any, _flags: Any, rc: int) -> None:
         if rc != 0:
@@ -205,6 +216,26 @@ class NavimowMqttClient:
         self.is_connected = False
         if self._on_connection_changed:
             self._loop.call_soon_threadsafe(self._on_connection_changed, False)
+
+    def _on_subscribe(
+        self, _client: mqtt_client.Client, _userdata: Any, mid: int, granted_qos: list[int]
+    ) -> None:
+        # Ohne diesen Callback ist aus dem Log nicht erkennbar, ob der Broker ein Subscribe
+        # (z.B. fuer den undokumentierten 'location'-Kanal) tatsaechlich per ACL gewaehrt oder
+        # mit Failure-Code 0x80/128 abgelehnt hat - beides sieht sonst identisch "still" aus.
+        topic = self._pending_subscriptions.pop(mid, "<unbekanntes Topic>")
+        if any(qos == 128 for qos in granted_qos):
+            _LOGGER.warning(
+                "Navimow MQTT: Subscribe fuer Topic '%s' vom Broker abgelehnt (granted_qos=%s)",
+                topic,
+                granted_qos,
+            )
+        else:
+            _LOGGER.debug(
+                "Navimow MQTT: Subscribe fuer Topic '%s' bestaetigt (granted_qos=%s)",
+                topic,
+                granted_qos,
+            )
 
     def _parse_topic(self, topic: str) -> str | None:
         parts = topic.split("/")

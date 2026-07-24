@@ -42,7 +42,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     coordinator = NavimowCoordinator(hass, entry, api_client)
     await coordinator.async_setup()
-    await coordinator.async_config_entry_first_refresh()
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except Exception:
+        # async_setup() hat bereits einen verbundenen MQTT-Client gestartet (eigener
+        # Hintergrund-Thread). Schlaegt der erste Refresh fehl (typischerweise
+        # ConfigEntryNotReady), bricht async_setup_entry() hier ab, BEVOR der Coordinator
+        # unten in hass.data landet - ohne dieses explizite Shutdown wuerde niemand je
+        # disconnect() auf diesem MQTT-Client aufrufen. HAs automatischer Setup-Retry baut
+        # dann bei jedem Versuch einen weiteren, ebenfalls verbundenen Client, waehrend die
+        # alten als Zombies weiterlaufen - live beobachtet als sich aufschaukelnder
+        # Reconnect-Sturm mit wachsender Zahl gleichzeitiger MQTT-Verbindungen (2026-07-24).
+        await coordinator.async_shutdown()
+        raise
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
