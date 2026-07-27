@@ -38,7 +38,9 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: NavimowCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([NavimowLawnMowerEntity(coordinator)])
+    async_add_entities(
+        NavimowLawnMowerEntity(coordinator, device_id) for device_id in coordinator.device_ids
+    )
 
 
 class NavimowLawnMowerEntity(NavimowEntity, LawnMowerEntity):
@@ -47,20 +49,21 @@ class NavimowLawnMowerEntity(NavimowEntity, LawnMowerEntity):
         LawnMowerEntityFeature.START_MOWING | LawnMowerEntityFeature.PAUSE | LawnMowerEntityFeature.DOCK
     )
 
-    def __init__(self, coordinator: NavimowCoordinator) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{coordinator.device_id}_lawn_mower"
+    def __init__(self, coordinator: NavimowCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{device_id}_lawn_mower"
 
     @property
     def activity(self) -> LawnMowerActivity | None:
-        if self.coordinator.data is None:
+        data = self._device_data
+        if data is None:
             return None
-        return _STATE_TO_ACTIVITY.get(self.coordinator.data.state)
+        return _STATE_TO_ACTIVITY.get(data.state)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Diagnose-Attribute, damit der Watchdog (Ziel 1) sichtbar/nachvollziehbar bleibt."""
-        data = self.coordinator.data
+        data = self._device_data
         if data is None:
             return {}
         return {
@@ -68,14 +71,16 @@ class NavimowLawnMowerEntity(NavimowEntity, LawnMowerEntity):
             "mqtt_connected": data.mqtt_connected,
             "last_rest_update": data.last_rest_update.isoformat(),
             "last_mqtt_update": data.last_mqtt_update.isoformat() if data.last_mqtt_update else None,
-            "last_command_result": self.coordinator.last_command_result,
+            "last_command_result": self.coordinator.last_command_result.get(self.device_id),
         }
 
     async def async_start_mowing(self) -> None:
-        await self.coordinator.async_send_command("async_start_mowing")
+        # device_id jetzt explizit durchreichen - der Coordinator kennt mehrere Geraete
+        # gleichzeitig und muss wissen, WELCHES gemeint ist.
+        await self.coordinator.async_send_command(self.device_id, "async_start_mowing")
 
     async def async_pause(self) -> None:
-        await self.coordinator.async_send_command("async_pause")
+        await self.coordinator.async_send_command(self.device_id, "async_pause")
 
     async def async_dock(self) -> None:
-        await self.coordinator.async_send_command("async_dock")
+        await self.coordinator.async_send_command(self.device_id, "async_dock")

@@ -4,6 +4,17 @@ Alle relevanten Änderungen an NaviWatch werden in dieser Datei dokumentiert.
 
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [0.3.0] - 2026-07-27
+
+### Hinzugefügt
+
+- **Unterstützung für mehrere Mäher.** Ein Account kann jetzt beliebig viele Mäher haben; der Coordinator pollt alle in einem REST-Call, teilt sich einen MQTT-Client für alle, und routet eingehende Nachrichten anhand der im jeweiligen MQTT-Topic enthaltenen `device_id`. `coordinator.data` ist jetzt `dict[device_id, NavimowData]` statt eines einzelnen Objekts, und jede Entity nimmt jetzt eine `device_id` entgegen, um ihren eigenen Ausschnitt nachzuschlagen. Bisher wurde immer nur `devices[0]` aus dem Account verwendet, was bei instabiler Geräte-Reihenfolge im Account bei jedem Neustart ein anderes Gerät auswählen und verwaiste "Geister"-Geräte in der Entity-Registry hinterlassen konnte.
+- Das Grundgerüst des Multi-Geräte-Umbaus (der `dict[device_id, ...]`-Coordinator, der gemeinsame MQTT-Client, Entities pro Gerät) stammt von [github.com/klarah32](https://github.com/klarah32) — vielen Dank dafür! Eine Anpassung wurde vor der Übernahme vorgenommen: Das in 0.2.2 hinzugefügte, zeitlich begrenzte Command-Verification-Feature (`COMMAND_VERIFICATION_SPECS`/`last_command_result`) war dabei verlorengegangen. Es wurde hier wiederhergestellt, jetzt pro `device_id` statt global, und am 2026-07-27 live gegen einen echten Mäher erneut verifiziert (`pause`/`start_mowing` beide `verified` bestätigt).
+
+### Bekannte Einschränkung
+
+- Es wird weiterhin nur ein Home-Assistant-Config-Entry (ein Segway/Navimow-Account) unterstützt. Mehrere Mäher im selben Account werden automatisch erkannt; ein zweiter, separater Account nicht — `config_flow.py` bindet seine `unique_id` weiterhin an die Integrations-Domain statt an einen Account.
+
 ## [0.2.2] - 2026-07-27
 
 ### Hinzugefügt

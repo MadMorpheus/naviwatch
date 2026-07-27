@@ -19,17 +19,21 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: NavimowCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(
-        [
-            NavimowBatterySensor(coordinator),
-            NavimowZoneSensor(coordinator),
-            NavimowMowProgressSensor(coordinator),
-            NavimowPositionXSensor(coordinator),
-            NavimowPositionYSensor(coordinator),
-            NavimowDockDistanceSensor(coordinator),
-            NavimowHeadingSensor(coordinator),
-        ]
-    )
+    # Ein vollstaendiger Satz Sensoren PRO Geraet im Account, nicht mehr nur fuer eines.
+    entities: list[SensorEntity] = []
+    for device_id in coordinator.device_ids:
+        entities.extend(
+            [
+                NavimowBatterySensor(coordinator, device_id),
+                NavimowZoneSensor(coordinator, device_id),
+                NavimowMowProgressSensor(coordinator, device_id),
+                NavimowPositionXSensor(coordinator, device_id),
+                NavimowPositionYSensor(coordinator, device_id),
+                NavimowDockDistanceSensor(coordinator, device_id),
+                NavimowHeadingSensor(coordinator, device_id),
+            ]
+        )
+    async_add_entities(entities)
 
 
 class NavimowBatterySensor(NavimowEntity, SensorEntity):
@@ -38,15 +42,16 @@ class NavimowBatterySensor(NavimowEntity, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = PERCENTAGE
 
-    def __init__(self, coordinator: NavimowCoordinator) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{coordinator.device_id}_battery"
+    def __init__(self, coordinator: NavimowCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{device_id}_battery"
 
     @property
     def native_value(self) -> int | None:
-        if self.coordinator.data is None:
+        data = self._device_data
+        if data is None:
             return None
-        return self.coordinator.data.battery
+        return data.battery
 
 
 class NavimowZoneSensor(NavimowEntity, SensorEntity):
@@ -59,19 +64,20 @@ class NavimowZoneSensor(NavimowEntity, SensorEntity):
 
     _attr_translation_key = "zone"
 
-    def __init__(self, coordinator: NavimowCoordinator) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{coordinator.device_id}_zone"
+    def __init__(self, coordinator: NavimowCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{device_id}_zone"
 
     @property
     def native_value(self) -> int | None:
-        if self.coordinator.data is None:
+        data = self._device_data
+        if data is None:
             return None
-        return self.coordinator.data.zone
+        return data.zone
 
     @property
     def extra_state_attributes(self) -> dict[str, object]:
-        data = self.coordinator.data
+        data = self._device_data
         if data is None:
             return {}
         return {
@@ -91,15 +97,16 @@ class NavimowMowProgressSensor(NavimowEntity, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = PERCENTAGE
 
-    def __init__(self, coordinator: NavimowCoordinator) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{coordinator.device_id}_mow_progress"
+    def __init__(self, coordinator: NavimowCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{device_id}_mow_progress"
 
     @property
     def native_value(self) -> int | None:
-        if self.coordinator.data is None:
+        data = self._device_data
+        if data is None:
             return None
-        return self.coordinator.data.mow_progress_pct
+        return data.mow_progress_pct
 
 
 class NavimowPositionXSensor(NavimowEntity, SensorEntity):
@@ -112,15 +119,16 @@ class NavimowPositionXSensor(NavimowEntity, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = UnitOfLength.METERS
 
-    def __init__(self, coordinator: NavimowCoordinator) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{coordinator.device_id}_position_x"
+    def __init__(self, coordinator: NavimowCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{device_id}_position_x"
 
     @property
     def native_value(self) -> float | None:
-        if self.coordinator.data is None:
+        data = self._device_data
+        if data is None:
             return None
-        return self.coordinator.data.pos_x
+        return data.pos_x
 
 
 class NavimowPositionYSensor(NavimowEntity, SensorEntity):
@@ -133,15 +141,16 @@ class NavimowPositionYSensor(NavimowEntity, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = UnitOfLength.METERS
 
-    def __init__(self, coordinator: NavimowCoordinator) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{coordinator.device_id}_position_y"
+    def __init__(self, coordinator: NavimowCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{device_id}_position_y"
 
     @property
     def native_value(self) -> float | None:
-        if self.coordinator.data is None:
+        data = self._device_data
+        if data is None:
             return None
-        return self.coordinator.data.pos_y
+        return data.pos_y
 
 
 class NavimowDockDistanceSensor(NavimowEntity, SensorEntity):
@@ -158,13 +167,13 @@ class NavimowDockDistanceSensor(NavimowEntity, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = UnitOfLength.METERS
 
-    def __init__(self, coordinator: NavimowCoordinator) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{coordinator.device_id}_dock_distance"
+    def __init__(self, coordinator: NavimowCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{device_id}_dock_distance"
 
     @property
     def native_value(self) -> float | None:
-        data = self.coordinator.data
+        data = self._device_data
         if data is None or data.pos_x is None or data.pos_y is None:
             return None
         return round(math.sqrt(data.pos_x**2 + data.pos_y**2), 2)
@@ -181,13 +190,13 @@ class NavimowHeadingSensor(NavimowEntity, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "°"
 
-    def __init__(self, coordinator: NavimowCoordinator) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{coordinator.device_id}_heading"
+    def __init__(self, coordinator: NavimowCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{device_id}_heading"
 
     @property
     def native_value(self) -> float | None:
-        data = self.coordinator.data
+        data = self._device_data
         if data is None or data.pos_theta is None:
             return None
         return round(math.degrees(data.pos_theta) % 360, 1)

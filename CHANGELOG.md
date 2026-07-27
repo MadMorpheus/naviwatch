@@ -4,6 +4,17 @@ All notable changes to NaviWatch are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 2026-07-27
+
+### Added
+
+- **Multi-mower support.** A single account can now have any number of mowers; the coordinator polls all of them in one REST call, shares one MQTT client across all of them, and routes incoming messages by the `device_id` embedded in each MQTT topic. `coordinator.data` is now `dict[device_id, NavimowData]` instead of a single object, and every entity now takes a `device_id` to look up its own slice. Previously, only `devices[0]` from the account was ever used, which could pick a different mower on every restart if the account's device order wasn't stable, leaving orphaned "ghost" devices behind in the entity registry.
+- The base multi-device rewrite (the `dict[device_id, ...]` coordinator, the shared MQTT client, per-device entities) was contributed by [github.com/klarah32](https://github.com/klarah32) — thank you! One thing was adapted from that contribution before merging: the bounded command-verification feature (`COMMAND_VERIFICATION_SPECS`/`last_command_result`, added in 0.2.2) had been dropped in the process. It's restored here, now tracked per `device_id` instead of globally, and re-verified live against a real mower (`pause`/`start_mowing` both confirmed `verified`) on 2026-07-27.
+
+### Known limitation
+
+- Only one Home Assistant config entry (one Segway/Navimow account) is supported. Multiple mowers under the *same* account are picked up automatically; a second, separate account is not — `config_flow.py` still ties its `unique_id` to the integration domain rather than to an account.
+
 ## [0.2.2] - 2026-07-27
 
 ### Added

@@ -17,27 +17,33 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: NavimowCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([NavimowMqttConnectedSensor(coordinator)])
+    async_add_entities(
+        NavimowMqttConnectedSensor(coordinator, device_id) for device_id in coordinator.device_ids
+    )
 
 
 class NavimowMqttConnectedSensor(NavimowEntity, BinarySensorEntity):
     """Sichtbarkeit fuer den Watchdog: zeigt, ob der schnelle MQTT-Pfad aktiv ist.
 
-    Auch wenn diese Entity 'aus' ist, liefert der REST-Poll-Fallback weiterhin Daten
-    (siehe coordinator.py) - dieser Sensor macht nur sichtbar, ob der schnelle Pfad
-    (Ziel 2: Aktualitaet) gerade funktioniert, nicht ob der Maeher grundsaetzlich erreichbar ist.
+    Der MQTT-Client ist fuer ALLE Geraete des Accounts gemeinsam - dieser Wert ist also pro
+    Geraet identisch, wird aber trotzdem pro Geraet als eigene Entity angezeigt, damit man
+    ihn direkt neben dem jeweiligen Maeher im Dashboard sieht. Auch wenn diese Entity "aus"
+    ist, liefert der REST-Poll-Fallback weiterhin Daten (siehe coordinator.py) - dieser
+    Sensor macht nur sichtbar, ob der schnelle Pfad gerade funktioniert, nicht ob der
+    jeweilige Maeher grundsaetzlich erreichbar ist.
     """
 
     _attr_translation_key = "mqtt_connected"
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
-    def __init__(self, coordinator: NavimowCoordinator) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{coordinator.device_id}_mqtt_connected"
+    def __init__(self, coordinator: NavimowCoordinator, device_id: str) -> None:
+        super().__init__(coordinator, device_id)
+        self._attr_unique_id = f"{device_id}_mqtt_connected"
 
     @property
     def is_on(self) -> bool | None:
-        if self.coordinator.data is None:
+        data = self._device_data
+        if data is None:
             return None
-        return self.coordinator.data.mqtt_connected
+        return data.mqtt_connected
