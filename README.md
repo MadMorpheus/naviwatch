@@ -81,7 +81,7 @@ NaviWatch uses its own domain (`navimow_custom`), so it **can run side by side**
 
 ## Usage 🎮
 
-After setup (OAuth2 login with your Segway account), you'll get one device with the following entities:
+After setup (OAuth2 login with your Segway account), you'll get one device per mower registered to that account (multiple mowers under the same account are detected and set up automatically), each with the following entities:
 
 | Entity | What it is |
 |---|---|
@@ -117,6 +117,10 @@ This is an independent, unofficial hobby project with no partnership or support 
 5. **Mower firmware updates.** New or changed `vehicleState` values (there's already one known firmware typo, `isIdel`) could fall outside the current state mapping.
 
 **Bottom line:** this is a solo project with no vendor relationship and no active monitoring on Segway's side. If something changes upstream, the integration will likely fail silently (errors in the log) until someone notices and updates the code — there's no guarantee of a fix, or a fix on any particular timeline.
+
+## Support ❤️
+
+If NaviWatch is useful to you, a small donation is appreciated but never expected: [paypal.me/mlaeseke](https://www.paypal.com/paypalme/mlaeseke/2.13)
 
 ## License
 

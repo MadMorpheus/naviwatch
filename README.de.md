@@ -81,7 +81,7 @@ NaviWatch nutzt eine eigene Domain (`navimow_custom`) und **kann parallel** zur 
 
 ## Usage 🎮
 
-Nach dem Einrichten (OAuth2-Login mit deinem Segway-Account) bekommst du ein Gerät mit folgenden Entitäten:
+Nach dem Einrichten (OAuth2-Login mit deinem Segway-Account) bekommst du ein Gerät pro Mäher, der in diesem Account registriert ist (mehrere Mäher im selben Account werden automatisch erkannt und eingerichtet), jeweils mit folgenden Entitäten:
 
 | Entität | Wofür |
 |---|---|
@@ -117,6 +117,10 @@ Das ist ein unabhängiges, inoffizielles Hobbyprojekt ohne Partnerschaft oder Su
 5. **Mäher-Firmware-Updates.** Neue oder geänderte `vehicleState`-Werte (es gibt schon einen bekannten Firmware-Tippfehler, `isIdel`) könnten außerhalb der aktuellen Zuordnung liegen.
 
 **Kurz gesagt:** Das ist ein Soloprojekt ohne Herstellerbeziehung und ohne aktives Monitoring seitens Segway. Falls sich stromaufwärts etwas ändert, fällt die Integration vermutlich still aus (Fehler im Log), bis es jemand bemerkt und den Code anpasst — es gibt keine Garantie auf einen Fix, erst recht nicht in einem bestimmten Zeitrahmen.
+
+## Unterstützung ❤️
+
+Falls dir NaviWatch nützlich ist, freue ich mich über eine kleine Spende — aber ganz ohne Erwartung: [paypal.me/mlaeseke](https://www.paypal.com/paypalme/mlaeseke/2.13)
 
 ## Lizenz
 
