@@ -68,6 +68,7 @@ class NavimowLawnMowerEntity(NavimowEntity, LawnMowerEntity):
             "mqtt_connected": data.mqtt_connected,
             "last_rest_update": data.last_rest_update.isoformat(),
             "last_mqtt_update": data.last_mqtt_update.isoformat() if data.last_mqtt_update else None,
+            "last_command_result": self.coordinator.last_command_result,
         }
 
     async def async_start_mowing(self) -> None:

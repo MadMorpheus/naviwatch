@@ -54,3 +54,36 @@ WATCHDOG_RECONNECT_DEBOUNCE: Final = timedelta(minutes=5)
 MOWER_STATE_TOPIC_CHANNELS: Final = ("state", "event", "attributes")
 
 CONF_DEVICE_ID: Final = "device_id"
+
+# Bounded Command-Verification nach dem Vorbild von doctee/symcon-navimow (siehe CLAUDE.md):
+# nach dem Senden eines Kommandos wird bis zu "timeout" Sekunden gepollt, ob der Zielzustand
+# tatsaechlich erreicht wird - vorher kehrte der Service-Call nach einem einzigen Poll zurueck,
+# unabhaengig vom Ergebnis, ein von der Cloud angenommenes aber vom Maeher nicht ausgefuehrtes
+# Kommando waere unbemerkt geblieben. "initial_delay" vor dem ersten Poll aus demselben Grund
+# wie zuvor: MQTT reagiert nachweislich schneller als ein sofortiger REST-Poll, ohne die Frist
+# wuerde der Watchdog faelschlich einen Mismatch sehen. Dock braucht ein deutlich laengeres
+# Budget (Rueckfahrt kann mehrere Minuten dauern) und laeuft deshalb im Hintergrund, damit der
+# Service-Call nicht minutenlang blockiert - "returning" gilt dabei als gueltiger Zwischenstand.
+COMMAND_VERIFICATION_SPECS: Final = {
+    "async_start_mowing": {
+        "target_states": frozenset({"mowing"}),
+        "initial_delay": 5,
+        "poll_interval": 10,
+        "timeout": 30,
+        "background": False,
+    },
+    "async_pause": {
+        "target_states": frozenset({"paused"}),
+        "initial_delay": 5,
+        "poll_interval": 10,
+        "timeout": 30,
+        "background": False,
+    },
+    "async_dock": {
+        "target_states": frozenset({"docked"}),
+        "initial_delay": 5,
+        "poll_interval": 60,
+        "timeout": 900,
+        "background": True,
+    },
+}

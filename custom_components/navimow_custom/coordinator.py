@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any
@@ -27,6 +28,7 @@ from homeassistant.util import dt as dt_util
 
 from .api import NavimowApiClient, NavimowApiError
 from .const import (
+    COMMAND_VERIFICATION_SPECS,
     COORDINATOR_UPDATE_TIMEOUT,
     DOMAIN,
     REST_POLL_INTERVAL,
@@ -117,6 +119,7 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
         self._last_mqtt_update: datetime | None = None
         self._mqtt_connected = False
         self._last_watchdog_reconnect: datetime | None = None
+        self.last_command_result: dict[str, Any] | None = None
 
     async def async_setup(self) -> None:
         """Geraet ermitteln und MQTT-Verbindung initial aufbauen. Vor dem ersten Refresh aufrufen."""
@@ -354,12 +357,10 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
         await super().async_shutdown()
 
     async def async_send_command(self, action: str) -> None:
-        """Kommando senden und danach zeitnah einen REST-Poll erzwingen (schnelles Feedback).
+        """Kommando senden (einmal, kein Retry) und danach das Ergebnis verifizieren.
 
-        Kurze Gnadenfrist vor dem erzwungenen Poll: MQTT reagiert live nachweislich innerhalb
-        von Sekunden auf echte Zustandswechsel. Ohne diese Frist wuerde der sofortige
-        Ausserplan-Poll fast immer einen Watchdog-Fehlalarm ausloesen (REST zeigt den neuen
-        Zustand, bevor MQTT ihn nachgeliefert hat) und einen unnoetigen Reconnect erzwingen.
+        Siehe COMMAND_VERIFICATION_SPECS in const.py fuer die Begruendung/Herkunft
+        (inspiriert von doctee/symcon-navimow, siehe CLAUDE.md).
         """
         if not self.device_id:
             return
@@ -368,5 +369,51 @@ class NavimowCoordinator(DataUpdateCoordinator[NavimowData]):
             await method(self.device_id)
         except NavimowApiError as err:
             raise UpdateFailed(f"Navimow-Kommando '{action}' fehlgeschlagen: {err}") from err
-        await asyncio.sleep(5)
-        await self.async_request_refresh()
+
+        spec = COMMAND_VERIFICATION_SPECS[action]
+        if spec["background"]:
+            # Dock: bis zu 15 Min Budget, Service-Call soll dafuer nicht blockieren. Geht bei
+            # einem HA-Neustart mitten in der Verifikation verloren, das ist unschaedlich
+            # (restart-safe wie bei symcon): kein Kommando-Replay noetig, der naechste normale
+            # REST-Poll zeigt den echten Zustand ohnehin.
+            self.hass.async_create_task(self._async_verify_command(action, spec))
+        else:
+            await self._async_verify_command(action, spec)
+
+    async def _async_verify_command(self, action: str, spec: dict[str, Any]) -> None:
+        """Nach einem Kommando pollen, bis der Zielzustand erreicht ist oder das Zeitbudget
+        auslaeuft. Ohne das kehrte der Service-Call bisher nach einem einzigen Poll zurueck,
+        unabhaengig vom tatsaechlichen Ergebnis - ein von der Cloud angenommenes, aber vom
+        Maeher aus irgendeinem Grund (Hindernis, Funkloch) nicht umgesetztes Kommando waere
+        unbemerkt geblieben.
+        """
+        deadline = time.monotonic() + spec["timeout"]
+        await asyncio.sleep(spec["initial_delay"])
+        while True:
+            await self.async_request_refresh()
+            state = self.data.state if self.data is not None else None
+            if state in spec["target_states"]:
+                self._set_command_result(action, "verified", state)
+                return
+            if time.monotonic() >= deadline:
+                self._set_command_result(action, "timeout", state)
+                _LOGGER.warning(
+                    "Navimow: Verifikation von '%s' nach %ss ohne Zielzustand abgebrochen "
+                    "(letzter bekannter Zustand: '%s') - Kommando wurde von der Cloud "
+                    "angenommen, aber nicht bestaetigt.",
+                    action,
+                    spec["timeout"],
+                    state,
+                )
+                return
+            await asyncio.sleep(spec["poll_interval"])
+
+    def _set_command_result(self, action: str, result: str, state: str | None) -> None:
+        self.last_command_result = {
+            "action": action,
+            "result": result,
+            "state": state,
+            "at": dt_util.utcnow().isoformat(),
+        }
+        if self.data is not None:
+            self.async_update_listeners()

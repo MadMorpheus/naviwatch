@@ -4,6 +4,12 @@ All notable changes to NaviWatch are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.2] - 2026-07-27
+
+### Added
+
+- **Bounded command verification** after `start_mowing`/`pause`/`dock`. Previously, the service call returned after a single poll regardless of outcome — a command accepted by the cloud but never actually carried out by the mower (obstacle, dead zone) would go unnoticed. Now the coordinator polls (up to a per-command timeout) until the target state is actually reached, and exposes the outcome as `last_command_result` (`verified` or `timeout`, plus the last known state) on the lawn mower entity's attributes. `dock` runs its verification in the background (budget up to 15 minutes for the return trip) so the service call itself doesn't block. Live-verified against the real mower on 2026-07-13, including a real ~1:38 min return trip — this release just catches it up in version control; it had been running unversioned since then.
+
 ## [0.2.1] - 2026-07-24
 
 ### Fixed

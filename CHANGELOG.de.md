@@ -4,6 +4,12 @@ Alle relevanten Änderungen an NaviWatch werden in dieser Datei dokumentiert.
 
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [0.2.2] - 2026-07-27
+
+### Hinzugefügt
+
+- **Zeitlich begrenzte Kommando-Verifikation** nach `start_mowing`/`pause`/`dock`. Bisher kehrte der Service-Call nach einem einzigen Poll zurück, unabhängig vom Ergebnis — ein von der Cloud angenommenes, aber vom Mäher nie tatsächlich ausgeführtes Kommando (Hindernis, Funkloch) wäre unbemerkt geblieben. Jetzt pollt der Coordinator (bis zu einem kommandospezifischen Zeitbudget), bis der Zielzustand tatsächlich erreicht ist, und stellt das Ergebnis als `last_command_result` (`verified` oder `timeout`, plus letzter bekannter Zustand) als Attribut am Mäher-Entity bereit. `dock` verifiziert im Hintergrund (Budget bis zu 15 Minuten für die Rückfahrt), damit der Service-Call selbst nicht blockiert. Live gegen den echten Mäher verifiziert am 2026-07-13, inklusive einer echten ~1:38-minütigen Rückfahrt — dieses Release holt das nur versionsmäßig nach, gelaufen ist es seitdem bereits unversioniert.
+
 ## [0.2.1] - 2026-07-24
 
 ### Behoben
