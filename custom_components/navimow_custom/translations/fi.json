@@ -1,0 +1,64 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "Valitse todennustapa"
+      },
+      "reauth_confirm": {
+        "title": "Todenna Navimow uudelleen",
+        "description": "Segway-kirjautuminen on vanhentunut tai peruutettu. Kirjaudu sisään uudelleen."
+      }
+    },
+    "abort": {
+      "already_configured": "Laite on jo määritetty",
+      "missing_config": "OAuth2-määritykset puuttuvat",
+      "reauth_successful": "Uudelleentodennus onnistui",
+      "oauth_error": "Virhe käyttöoikeustunnuksen hakemisessa",
+      "oauth_timeout": "Todennus aikakatkaistiin",
+      "oauth_unauthorized": "OAuth2-valtuutus epäonnistui"
+    },
+    "create_entry": {
+      "default": "Yhdistetty Navimow-laitteeseen onnistuneesti"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Navimow-asetukset",
+        "data": {
+          "poll_interval_seconds": "REST-kyselyväli (sekuntia)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "battery": {
+        "name": "Akku"
+      },
+      "zone": {
+        "name": "Alue"
+      },
+      "mow_progress": {
+        "name": "Leikkuun edistyminen"
+      },
+      "position_x": {
+        "name": "Sijainti X"
+      },
+      "position_y": {
+        "name": "Sijainti Y"
+      },
+      "dock_distance": {
+        "name": "Etäisyys latausasemasta"
+      },
+      "heading": {
+        "name": "Suunta"
+      }
+    },
+    "binary_sensor": {
+      "mqtt_connected": {
+        "name": "MQTT yhdistetty"
+      }
+    }
+  }
+}

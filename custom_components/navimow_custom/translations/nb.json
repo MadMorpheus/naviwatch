@@ -1,0 +1,64 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "Velg autentiseringsmetode"
+      },
+      "reauth_confirm": {
+        "title": "Autentiser Navimow på nytt",
+        "description": "Segway-innloggingen er utløpt eller har blitt tilbakekalt. Vennligst logg inn på nytt."
+      }
+    },
+    "abort": {
+      "already_configured": "Enheten er allerede konfigurert",
+      "missing_config": "OAuth2-konfigurasjon mangler",
+      "reauth_successful": "Ny autentisering vellykket",
+      "oauth_error": "Feil ved henting av tilgangstoken",
+      "oauth_timeout": "Tidsavbrudd under autentisering",
+      "oauth_unauthorized": "OAuth2-autorisasjon mislyktes"
+    },
+    "create_entry": {
+      "default": "Koblet til Navimow"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Navimow-alternativer",
+        "data": {
+          "poll_interval_seconds": "REST-pollingintervall (sekunder)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "battery": {
+        "name": "Batteri"
+      },
+      "zone": {
+        "name": "Sone"
+      },
+      "mow_progress": {
+        "name": "Klippefremdrift"
+      },
+      "position_x": {
+        "name": "Posisjon X"
+      },
+      "position_y": {
+        "name": "Posisjon Y"
+      },
+      "dock_distance": {
+        "name": "Avstand til ladestasjon"
+      },
+      "heading": {
+        "name": "Retning"
+      }
+    },
+    "binary_sensor": {
+      "mqtt_connected": {
+        "name": "MQTT tilkoblet"
+      }
+    }
+  }
+}

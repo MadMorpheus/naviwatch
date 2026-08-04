@@ -1,0 +1,64 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "Vælg godkendelsesmetode"
+      },
+      "reauth_confirm": {
+        "title": "Genautorisér Navimow",
+        "description": "Segway-loginet er udløbet eller er blevet tilbagekaldt. Log venligst ind igen."
+      }
+    },
+    "abort": {
+      "already_configured": "Enheden er allerede konfigureret",
+      "missing_config": "OAuth2-konfiguration mangler",
+      "reauth_successful": "Genautorisering lykkedes",
+      "oauth_error": "Fejl ved hentning af adgangstoken",
+      "oauth_timeout": "Tidsudløb under godkendelse",
+      "oauth_unauthorized": "OAuth2-autorisation mislykkedes"
+    },
+    "create_entry": {
+      "default": "Forbundet til Navimow"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Navimow-indstillinger",
+        "data": {
+          "poll_interval_seconds": "REST-pollingsinterval (sekunder)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "battery": {
+        "name": "Batteri"
+      },
+      "zone": {
+        "name": "Zone"
+      },
+      "mow_progress": {
+        "name": "Slåningsfremskridt"
+      },
+      "position_x": {
+        "name": "Position X"
+      },
+      "position_y": {
+        "name": "Position Y"
+      },
+      "dock_distance": {
+        "name": "Afstand til ladestation"
+      },
+      "heading": {
+        "name": "Retning"
+      }
+    },
+    "binary_sensor": {
+      "mqtt_connected": {
+        "name": "MQTT forbundet"
+      }
+    }
+  }
+}

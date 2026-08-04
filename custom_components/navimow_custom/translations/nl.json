@@ -1,0 +1,64 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "Authenticatiemethode kiezen"
+      },
+      "reauth_confirm": {
+        "title": "Navimow opnieuw authenticeren",
+        "description": "De Segway-login is verlopen of ingetrokken. Log opnieuw in."
+      }
+    },
+    "abort": {
+      "already_configured": "Apparaat is al geconfigureerd",
+      "missing_config": "OAuth2-configuratie ontbreekt",
+      "reauth_successful": "Opnieuw authenticeren geslaagd",
+      "oauth_error": "Fout bij het ophalen van het toegangstoken",
+      "oauth_timeout": "Time-out tijdens authenticatie",
+      "oauth_unauthorized": "OAuth2-autorisatie mislukt"
+    },
+    "create_entry": {
+      "default": "Succesvol verbonden met Navimow"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Navimow-opties",
+        "data": {
+          "poll_interval_seconds": "REST-pollinterval (seconden)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "battery": {
+        "name": "Batterij"
+      },
+      "zone": {
+        "name": "Zone"
+      },
+      "mow_progress": {
+        "name": "Maaivoortgang"
+      },
+      "position_x": {
+        "name": "Positie X"
+      },
+      "position_y": {
+        "name": "Positie Y"
+      },
+      "dock_distance": {
+        "name": "Afstand tot laadstation"
+      },
+      "heading": {
+        "name": "Richting"
+      }
+    },
+    "binary_sensor": {
+      "mqtt_connected": {
+        "name": "MQTT verbonden"
+      }
+    }
+  }
+}

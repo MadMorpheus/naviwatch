@@ -1,0 +1,64 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "Choisir la méthode d'authentification"
+      },
+      "reauth_confirm": {
+        "title": "Réauthentifier Navimow",
+        "description": "La connexion Segway a expiré ou a été révoquée. Veuillez vous reconnecter."
+      }
+    },
+    "abort": {
+      "already_configured": "L'appareil est déjà configuré",
+      "missing_config": "Configuration OAuth2 manquante",
+      "reauth_successful": "Réauthentification réussie",
+      "oauth_error": "Erreur lors de la récupération du jeton d'accès",
+      "oauth_timeout": "Délai d'authentification dépassé",
+      "oauth_unauthorized": "Échec de l'autorisation OAuth2"
+    },
+    "create_entry": {
+      "default": "Connexion à Navimow réussie"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options Navimow",
+        "data": {
+          "poll_interval_seconds": "Intervalle d'interrogation REST (secondes)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "battery": {
+        "name": "Batterie"
+      },
+      "zone": {
+        "name": "Zone"
+      },
+      "mow_progress": {
+        "name": "Progression de la tonte"
+      },
+      "position_x": {
+        "name": "Position X"
+      },
+      "position_y": {
+        "name": "Position Y"
+      },
+      "dock_distance": {
+        "name": "Distance à la station de charge"
+      },
+      "heading": {
+        "name": "Cap"
+      }
+    },
+    "binary_sensor": {
+      "mqtt_connected": {
+        "name": "MQTT connecté"
+      }
+    }
+  }
+}

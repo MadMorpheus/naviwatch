@@ -1,0 +1,64 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "Wybierz metodę uwierzytelniania"
+      },
+      "reauth_confirm": {
+        "title": "Ponowne uwierzytelnienie Navimow",
+        "description": "Logowanie Segway wygasło lub zostało cofnięte. Zaloguj się ponownie."
+      }
+    },
+    "abort": {
+      "already_configured": "Urządzenie jest już skonfigurowane",
+      "missing_config": "Brak konfiguracji OAuth2",
+      "reauth_successful": "Ponowne uwierzytelnienie powiodło się",
+      "oauth_error": "Błąd podczas pobierania tokenu dostępu",
+      "oauth_timeout": "Przekroczono limit czasu podczas uwierzytelniania",
+      "oauth_unauthorized": "Autoryzacja OAuth2 nie powiodła się"
+    },
+    "create_entry": {
+      "default": "Pomyślnie połączono z Navimow"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opcje Navimow",
+        "data": {
+          "poll_interval_seconds": "Interwał odpytywania REST (sekundy)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "battery": {
+        "name": "Bateria"
+      },
+      "zone": {
+        "name": "Strefa"
+      },
+      "mow_progress": {
+        "name": "Postęp koszenia"
+      },
+      "position_x": {
+        "name": "Pozycja X"
+      },
+      "position_y": {
+        "name": "Pozycja Y"
+      },
+      "dock_distance": {
+        "name": "Odległość od stacji dokującej"
+      },
+      "heading": {
+        "name": "Kierunek"
+      }
+    },
+    "binary_sensor": {
+      "mqtt_connected": {
+        "name": "MQTT połączone"
+      }
+    }
+  }
+}
