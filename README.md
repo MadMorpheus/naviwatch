@@ -73,11 +73,7 @@ Uses the `navimow_custom` domain internally, so it can be installed alongside ot
 
 ## Already have another Navimow integration installed? 🔀
 
-NaviWatch uses its own domain (`navimow_custom`), so it **can run side by side** with the official `segwaynavimow/NavimowHA` integration (or forks of it) without any conflict — no need to remove anything first.
-
-* **Keep both**: useful while you're evaluating NaviWatch — you'll get a second set of entities (Home Assistant appends `_2` to names if they'd otherwise collide) so you can compare behavior before committing.
-* **Switch over fully**: once you trust NaviWatch, remove the other integration via Settings → Devices & Services → find it → three-dot menu → **Delete**. Afterwards, update any automations/dashboards that reference the old entity IDs to point to NaviWatch's entities instead (Settings → Devices & Services → NaviWatch → device page lists the current entity IDs).
-* There is no automatic migration of settings or history between the two integrations — each keeps its own entities and state history.
+NaviWatch uses its own domain (`navimow_custom`), so it **can run side by side** with the official `segwaynavimow/NavimowHA` integration (or forks) without conflict — nothing needs removing first. Home Assistant appends `_2` to entity names on collision, so you get a second set to compare. Once you trust NaviWatch, remove the other integration (Settings → Devices & Services → three-dot menu → **Delete**) and repoint any automations/dashboards to NaviWatch's entity IDs — there's no automatic settings/history migration between the two.
 
 ## Usage 🎮
 
@@ -88,7 +84,7 @@ After setup (OAuth2 login with your Segway account), you'll get one device per m
 | `lawn_mower` | The main entity. State is one of `mowing`, `paused`, `returning`, `docked`, `error`. Supports Start/Pause/Dock. Diagnostic attributes (`raw_state`, `mqtt_connected`, `last_rest_update`, `last_mqtt_update`) let you confirm the watchdog is working. |
 | Battery `sensor` | Battery percentage. |
 | MQTT connection `binary_sensor` (diagnostic) | Whether the fast MQTT push path is currently connected. Not an indicator of overall reachability — REST polling keeps the mower entity working regardless. |
-| Zone `sensor` | Current physical mowing zone/partition ID. This is an **internal ID assigned by Segway's backend**, not the same as the "Zone 1"/"Zone 2" labels in the app (confirmed live: two real zones showed IDs `9` and `4`). **These IDs are not sequential/predictable** — before building automations around a specific zone, start each zone once via the app and note the ID that appears (Developer Tools → States, or the entity's state on the dashboard). Attributes: `target_zone` (zone selected at mow start), `task_delay` (rain/schedule delay). |
+| Zone `sensor` | Current physical mowing zone/partition ID — an **internal ID from Segway's backend**, not the app's "Zone 1"/"Zone 2" labels (live-confirmed IDs: `9` and `4`) and **not predictable**. Start each zone once via the app to note its ID before building automations. Attributes: `target_zone` (zone selected at mow start), `task_delay` (rain/schedule delay). |
 | Mowing progress `sensor` | Route-plan progress, 0–100% for the current task (not area coverage). Confirmed live to match the percentage shown in the official app exactly. |
 | Position X / Position Y `sensor` | Local Cartesian coordinates in meters, relative to the charging dock — **not GPS**. Useful for custom automations, e.g. defining your own sub-areas or detecting if the mower hasn't moved in a while. |
 | Distance from dock `sensor` | Derived (`sqrt(x² + y²)`) straight-line distance from the dock, in meters. Doubles as a stall/freeze signal — an unmoving value while `state=mowing` is suspicious. |
@@ -108,15 +104,13 @@ Wondering exactly when/how often each entity updates? See [ARCHITECTURE.md](ARCH
 
 ## Known risks — this could break, and it's not in my hands ⚠️
 
-This is an independent, unofficial hobby project with no partnership or support agreement with Segway. Roughly in order of likelihood:
+This is an independent, unofficial hobby project with no partnership or support agreement with Segway — if something breaks upstream, expect it to fail silently (errors in the log) until someone notices and fixes it, with no guaranteed timeline. Roughly in order of likelihood:
 
-1. **Segway changes something on their backend.** No guarantee of API stability. The most fragile part is the **undocumented** MQTT `location` channel (zone/progress data) — reverse-engineered from a third-party fork, not part of any official API, and could change or disappear without notice. The core functionality (status, battery, start/pause/dock) uses the same endpoints as the official app, which is somewhat more stable but still not guaranteed.
-2. **Segway rotates or restricts the shared OAuth client** (`client_id`/`client_secret`, a "public client" used by every community integration of this kind). If they ever lock that down, every non-official integration — including this one — would need new credentials.
-3. **Home Assistant core changes.** Its OAuth2 framework or `DataUpdateCoordinator` API could change in a future major version. HA's blocking-call detector is also getting stricter over time and may flag currently-unnoticed issues in future releases.
-4. **The `paho-mqtt` library changes.** This integration intentionally uses the older `CallbackAPIVersion.VERSION1` API, which a future major version could remove.
-5. **Mower firmware updates.** New or changed `vehicleState` values (there's already one known firmware typo, `isIdel`) could fall outside the current state mapping.
-
-**Bottom line:** this is a solo project with no vendor relationship and no active monitoring on Segway's side. If something changes upstream, the integration will likely fail silently (errors in the log) until someone notices and updates the code — there's no guarantee of a fix, or a fix on any particular timeline.
+1. **Segway changes their backend.** No API stability guarantee. Most fragile: the **undocumented** MQTT `location` channel (zone/progress), reverse-engineered from a third-party fork — could change or vanish without notice. Core functionality (status, battery, start/pause/dock) uses the same endpoints as the official app, somewhat more stable but still unguaranteed.
+2. **Segway locks down the shared OAuth client** (`client_id`/`client_secret`, used by every community integration of this kind) — would require new credentials for all of them, including this one.
+3. **Home Assistant core changes** to the OAuth2 framework, `DataUpdateCoordinator` API, or its increasingly strict blocking-call detector.
+4. **`paho-mqtt` removes** the older `CallbackAPIVersion.VERSION1` API this integration intentionally uses.
+5. **Mower firmware updates** introduce new/changed `vehicleState` values (one known typo already exists: `isIdel`) outside the current mapping.
 
 ## Support ❤️
 
