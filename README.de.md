@@ -45,7 +45,7 @@ Bestehende Community-Integrationen frieren nach ca. einer Stunde reproduzierbar 
 
 * Native `lawn_mower`-Entity, volle Automations-Kompatibilität
 * Eigenes Brand-Icon/Logo
-* Übersetzt: Deutsch, Englisch
+* Übersetzt: Deutsch, Englisch, Schwedisch, Niederländisch, Polnisch, Französisch, Dänisch, Finnisch, Norwegisch (Bokmål)
 
 ## Prerequisites 📋
 

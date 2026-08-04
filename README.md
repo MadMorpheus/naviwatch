@@ -45,7 +45,7 @@ Existing community integrations reproducibly freeze after about an hour and don'
 
 * Native `lawn_mower` entity, full automation compatibility
 * Own brand icon/logo
-* Translated: English, German
+* Translated: English, German, Swedish, Dutch, Polish, French, Danish, Finnish, Norwegian (Bokmål)
 
 ## Prerequisites 📋
 
