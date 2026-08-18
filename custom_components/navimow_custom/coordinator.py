@@ -154,6 +154,10 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
     wenn nur ein einzelnes Geraet einen Mismatch zeigt.
     """
 
+    # Mindestabstand zwischen zwei MQTT-Zugangsdaten-Refreshes; der Server antwortet
+    # bei Ueberlast mit "Request too frequent. Please retry after 1 minute."
+    _MQTT_CRED_COOLDOWN = 60.0
+
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, api_client: NavimowApiClient) -> None:
         poll_seconds = entry.options.get("poll_interval_seconds", int(REST_POLL_INTERVAL.total_seconds()))
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=timedelta(seconds=poll_seconds))
@@ -168,6 +172,8 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
         # Pro Geraet, nicht mehr global - jedes Geraet kann unabhaengig ein eigenes
         # Kommando bekommen und braucht daher sein eigenes Verifikationsergebnis.
         self.last_command_result: dict[str, dict[str, Any]] = {}
+        self._mqtt_cred_lock = asyncio.Lock()
+        self._mqtt_cred_last_attempt = 0.0
 
     def device_info_raw(self, device_id: str) -> dict[str, Any]:
         """Rohe Account-Metadaten (name/model/firmware) fuer EIN Geraet - fuer entity.py."""
@@ -252,11 +258,28 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
     async def _async_refresh_mqtt_credentials(self) -> None:
         if self._mqtt is None:
             return
-        try:
-            mqtt_info = await self.api.async_get_mqtt_user_info()
-        except NavimowApiError as err:
-            _LOGGER.warning("Navimow: MQTT-Zugangsdaten konnten nicht aufgefrischt werden: %s", err)
+        # Jeder Disconnect stoesst ueber _handle_mqtt_connection_changed einen eigenen
+        # async_create_task an. Ohne Single-Flight-Sperre und Cooldown entsteht bei
+        # rate-limitiertem Endpoint eine sich selbst erhaltende Schleife: Refresh
+        # scheitert -> Client behaelt die ALTEN Zugangsdaten -> naechster Disconnect
+        # -> naechster Refresh. Live beobachtet 2026-08-18: 36 Versuche im Abstand von
+        # ~1,6 s, wodurch gerade die Retries das Rate-Limit aufrecht hielten.
+        if self._mqtt_cred_lock.locked():
             return
+        async with self._mqtt_cred_lock:
+            elapsed = time.monotonic() - self._mqtt_cred_last_attempt
+            if elapsed < self._MQTT_CRED_COOLDOWN:
+                _LOGGER.debug(
+                    "Navimow: MQTT-Zugangsdaten-Refresh uebersprungen (%.0fs seit letztem Versuch)",
+                    elapsed,
+                )
+                return
+            self._mqtt_cred_last_attempt = time.monotonic()
+            try:
+                mqtt_info = await self.api.async_get_mqtt_user_info()
+            except NavimowApiError as err:
+                _LOGGER.warning("Navimow: MQTT-Zugangsdaten konnten nicht aufgefrischt werden: %s", err)
+                return
         await self._mqtt.update_credentials(
             username=mqtt_info.get("userName"),
             password=mqtt_info.get("pwdInfo"),
