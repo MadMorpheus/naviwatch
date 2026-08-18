@@ -4,6 +4,13 @@ Alle relevanten Änderungen an NaviWatch werden in dieser Datei dokumentiert.
 
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unreleased]
+
+### Behoben
+
+- **Ein rate-limitierter Abruf der MQTT-Zugangsdaten beim Setup legte die Integration still, bis sie manuell neu geladen wurde.** `async_setup()` sicherte `async_get_devices()` mit `ConfigEntryNotReady` ab, der direkt darunter stehende Aufruf `_async_connect_mqtt()` jedoch nicht — der `NavimowApiError` aus `async_get_mqtt_user_info()` verliess `async_setup_entry()` also als gewoehnliche Exception. Home Assistant wertet alles ausser `ConfigEntryNotReady` als endgueltigen Setup-Fehler und plant keinen Retry ein. Bei der stuendlichen OAuth-Rotation laedt der Entry neu und holt sofort neue MQTT-Zugangsdaten, was Segway rate-limitet (`Request too frequent. Please retry after 1 minute.`) — beobachtet auf einem US-Account am 17.08.2026 um 18:17, danach blieb die Integration 8,5 Stunden tot, obwohl der Fehler laut eigener Beschreibung voruebergehend ist. Jetzt wird `ConfigEntryNotReady` geworfen, Home Assistant wartet ab und versucht es erneut; live verifiziert am 18.08.2026 um 13:37, wo sich dasselbe Rate-Limit nach 6 Sekunden von selbst aufloeste.
+- **Der Refresh der MQTT-Zugangsdaten konnte das Rate-Limit, auf das er stiess, selbst aufrechterhalten.** `_handle_mqtt_connection_changed()` startet `_async_refresh_mqtt_credentials()` bei jedem Disconnect ueber `async_create_task()`. Schlug dieser Refresh wegen des Rate-Limits fehl, wurde nur eine Warnung geloggt und zurueckgekehrt — der Client behielt seine alten Zugangsdaten, verband sich neu, scheiterte, trennte und stiess den naechsten Refresh an. Beobachtet am 18.08.2026 zwischen 12:34 und 13:33: 36 Versuche im Abstand von rund 1,6 Sekunden. Eine Single-Flight-Sperre buendelt aufgelaufene Disconnect-Tasks jetzt zu einem einzigen laufenden Refresh, und ein Cooldown von 60 Sekunden (entsprechend dem Hinweis des Servers) begrenzt den schlimmsten Fall auf einen Aufruf pro Minute statt etwa 37. `update_credentials()` bleibt ausserhalb der Sperre, damit MQTT-Arbeit sie nie haelt.
+
 ## [0.3.0] - 2026-07-27
 
 ### Hinzugefügt

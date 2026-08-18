@@ -4,6 +4,13 @@ All notable changes to NaviWatch are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **A rate-limited MQTT credential fetch during setup killed the integration until it was manually reloaded.** `async_setup()` guarded `async_get_devices()` with `ConfigEntryNotReady`, but the `_async_connect_mqtt()` call directly below it was unguarded, so the `NavimowApiError` from `async_get_mqtt_user_info()` propagated out of `async_setup_entry()` as a plain exception. Home Assistant treats anything other than `ConfigEntryNotReady` as a permanent setup failure and schedules no retry. At the hourly OAuth rotation the entry reloads and immediately re-fetches MQTT credentials, which Segway rate-limits (`Request too frequent. Please retry after 1 minute.`) — observed on a US account on 2026-08-17 at 18:17, after which the integration stayed dead for 8.5 hours despite the error being transient by its own description. It now raises `ConfigEntryNotReady`, so Home Assistant backs off and retries; verified live on 2026-08-18 at 13:37, where the same rate limit resolved itself in 6 seconds.
+- **The MQTT credential refresh could sustain the very rate limit it was hitting.** `_handle_mqtt_connection_changed()` schedules `_async_refresh_mqtt_credentials()` via `async_create_task()` on every disconnect. When that refresh was rate-limited it logged a warning and returned, leaving the client with stale credentials — so it reconnected, failed, disconnected, and triggered another refresh. Observed on 2026-08-18 between 12:34 and 13:33: 36 attempts bursting roughly every 1.6 seconds. A single-flight guard now collapses piled-up disconnect tasks into one in-flight refresh, and a 60-second cooldown (matching the server's own retry advice) caps the worst case at one call per minute instead of about 37. `update_credentials()` remains outside the lock so MQTT work never holds it.
+
 ## [0.3.0] - 2026-07-27
 
 ### Added
