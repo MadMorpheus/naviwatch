@@ -194,7 +194,17 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
             on_message=self._handle_mqtt_message,
             on_connection_changed=self._handle_mqtt_connection_changed,
         )
-        await self._async_connect_mqtt()
+        try:
+            await self._async_connect_mqtt()
+        except NavimowApiError as err:
+            # Bei der stuendlichen Token-Rotation laedt der Entry neu und holt sofort
+            # neue MQTT-Zugangsdaten; Segway rate-limitet diesen Burst
+            # ("Request too frequent. Please retry after 1 minute."). Ohne
+            # ConfigEntryNotReady wertet Home Assistant das als endgueltigen
+            # Setup-Fehler OHNE Retry - die Integration bleibt tot, bis jemand
+            # manuell neu laedt. Der Aufruf direkt darueber (async_get_devices)
+            # ist bereits genauso abgesichert.
+            raise ConfigEntryNotReady(f"MQTT-Zugangsdaten nicht abrufbar: {err}") from err
 
     async def _async_connect_mqtt(self) -> None:
         assert self._mqtt is not None
