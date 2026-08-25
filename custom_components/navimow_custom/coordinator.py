@@ -241,8 +241,14 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
         self.async_update_listeners()
 
     def _handle_mqtt_connection_changed(self, connected: bool) -> None:
+        # Seit der MQTT-Client auch fehlgeschlagene Verbindungsversuche meldet (on_connect_fail),
+        # kommt "nicht verbunden" waehrend paho's Reconnect-Backoff wiederholt an - im
+        # Extremfall im Sekundentakt. Entities muessen davon nur bei einem echten Wechsel
+        # erfahren; der Refresh unten dagegen soll bei JEDEM Versuch angestossen werden, weil
+        # genau er die Erholung antreibt (Single-Flight und Cooldown begrenzen ihn ohnehin).
+        state_changed = connected != self._mqtt_connected
         self._mqtt_connected = connected
-        if self.data:
+        if state_changed and self.data:
             # Der MQTT-Client ist fuer alle Geraete gemeinsam - ein Verbindungswechsel
             # betrifft daher gleichzeitig alle bekannten Geraete, nicht nur eines.
             updated = {

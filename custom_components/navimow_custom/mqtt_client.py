@@ -73,6 +73,8 @@ class NavimowMqttClient:
         # Einweg-Flag, gesetzt von disconnect(). Ein Reload legt ohnehin eine neue
         # NavimowMqttClient-Instanz an, es muss also nie zurueckgesetzt werden.
         self._closed = False
+        # Letzter von _on_connect gemeldeter Fehlercode, nur fuer die Log-Entdopplung.
+        self._last_connect_rc: int | None = None
 
     def configure(
         self,
@@ -108,6 +110,7 @@ class NavimowMqttClient:
         client.reconnect_delay_set(min_delay=MQTT_RECONNECT_MIN_DELAY, max_delay=MQTT_RECONNECT_MAX_DELAY)
         client.on_connect = self._on_connect
         client.on_disconnect = self._on_disconnect
+        client.on_connect_fail = self._on_connect_fail
         client.on_message = self._on_mqtt_message
         client.on_subscribe = self._on_subscribe
         return client
@@ -330,21 +333,52 @@ class NavimowMqttClient:
         if not self._is_current(client):
             return
         if rc != 0:
-            _LOGGER.warning("Navimow MQTT connect failed: rc=%s", rc)
+            # Nur den ERSTEN Fehlschlag einer Serie auf WARNING. paho versucht es danach im
+            # Backoff (bis MQTT_RECONNECT_MAX_DELAY) unbegrenzt weiter, ein dauerhaft
+            # abgelehnter Broker - abgelaufene Zugangsdaten, Maeher ueber Winter aus - wuerde
+            # das Log sonst dauerhaft mit derselben Zeile fuellen. Genau diese Art von
+            # Log-Lawine soll dieser Patch beseitigen, nicht an anderer Stelle neu erzeugen.
+            if rc != self._last_connect_rc:
+                _LOGGER.warning("Navimow MQTT connect failed: rc=%s", rc)
+            else:
+                _LOGGER.debug("Navimow MQTT connect failed: rc=%s (unveraendert)", rc)
+            self._last_connect_rc = rc
+            self._report_disconnected()
             return
         _LOGGER.debug("Navimow MQTT connected")
+        self._last_connect_rc = None
         self._subscribe_all(client)
         self.is_connected = True
         if self._on_connection_changed:
             self._loop.call_soon_threadsafe(self._on_connection_changed, True)
 
+    def _on_connect_fail(self, client: mqtt_client.Client, _userdata: Any) -> None:
+        # Ein fehlgeschlagener VERBINDUNGSAUFBAU meldet sich nicht ueber on_disconnect:
+        # loop_forever() faengt den Fehler ab und ruft _handle_on_connect_fail(). Genau
+        # dieser Pfad greift beim abgelaufenen Token - der Bearer-Header wird schon beim
+        # WSS-Upgrade abgelehnt (paho wirft WebsocketConnectionError), es kommt also nie zu
+        # einem CONNACK und damit nie zu einem on_disconnect. Vom Broker abgelehnte
+        # Zugangsdaten (CONNACK rc=4/5) laufen dagegen sehr wohl ueber on_disconnect, paho
+        # gibt dafuer MQTT_ERR_CONN_REFUSED zurueck. Ohne diesen Callback erfaehrt der
+        # Coordinator vom haeufigeren der beiden Faelle nichts und frischt die Zugangsdaten
+        # nie auf; die Erholung haengt dann daran, dass zufaellig ein anderer Disconnect
+        # eintrifft.
+        if not self._is_current(client):
+            return
+        _LOGGER.debug("Navimow MQTT: Verbindungsaufbau fehlgeschlagen")
+        self._report_disconnected()
+
+    def _report_disconnected(self) -> None:
+        """Als getrennt markieren und den Coordinator informieren (Thread-Uebergang)."""
+        self.is_connected = False
+        if self._on_connection_changed:
+            self._loop.call_soon_threadsafe(self._on_connection_changed, False)
+
     def _on_disconnect(self, client: mqtt_client.Client, _userdata: Any, rc: int) -> None:
         if not self._is_current(client):
             return
         _LOGGER.debug("Navimow MQTT disconnected (rc=%s)", rc)
-        self.is_connected = False
-        if self._on_connection_changed:
-            self._loop.call_soon_threadsafe(self._on_connection_changed, False)
+        self._report_disconnected()
 
     def _on_subscribe(
         self, client: mqtt_client.Client, _userdata: Any, mid: int, granted_qos: list[int]
