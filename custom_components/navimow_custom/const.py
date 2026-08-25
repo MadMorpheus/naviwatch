@@ -44,6 +44,11 @@ MQTT_KEEPALIVE_SECONDS: Final = 2400
 MQTT_RECONNECT_MIN_DELAY: Final = 1
 MQTT_RECONNECT_MAX_DELAY: Final = 60
 
+# Obergrenze fuer das Stoppen eines MQTT-Clients (_async_teardown_client). loop_stop()
+# joint den paho-Netzwerk-Thread; haengt der fest, darf das nicht unbegrenzt den
+# _connect_lock halten, hinter dem inzwischen jeder Verbindungsweg steht.
+MQTT_TEARDOWN_TIMEOUT: Final = 10
+
 # Live beobachtet 2026-07-08: ein bestehender REST/MQTT-Status-Mismatch (z.B. waehrend
 # stabilem Maehen ohne MQTT-Events) loeste bei jedem weiteren Poll erneut einen erzwungenen
 # Reconnect aus, obwohl der erste bereits alles Noetige getan hatte (3x zwischen 13:52 und

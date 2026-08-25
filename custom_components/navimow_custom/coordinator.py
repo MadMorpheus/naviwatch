@@ -155,8 +155,10 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
     """
 
     # Mindestabstand zwischen zwei MQTT-Zugangsdaten-Refreshes; der Server antwortet
-    # bei Ueberlast mit "Request too frequent. Please retry after 1 minute."
-    _MQTT_CRED_COOLDOWN = 60.0
+    # bei Ueberlast mit "Request too frequent. Please retry after 1 minute." Etwas mehr als
+    # diese Minute, damit Scheduling- und Laufzeitjitter nicht ausgerechnet wieder in
+    # dasselbe Rate-Limit laufen.
+    _MQTT_CRED_COOLDOWN = 65.0
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, api_client: NavimowApiClient) -> None:
         poll_seconds = entry.options.get("poll_interval_seconds", int(REST_POLL_INTERVAL.total_seconds()))
@@ -253,7 +255,9 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
             # Gegenlesen von NavimowHAs echtem __init__.py bestaetigt: dort explizit noetig,
             # um CODE_OAUTH_INFO_ILLEGAL beim Reconnect nach Token-Rotation zu vermeiden).
             # Deshalb bei jedem Disconnect frisch abrufen, nicht nur den Token durchreichen.
-            self.hass.async_create_task(self._async_refresh_mqtt_credentials())
+            self.hass.async_create_task(
+                self._async_refresh_mqtt_credentials(), name="navimow_refresh_mqtt_credentials"
+            )
 
     async def _async_refresh_mqtt_credentials(self) -> None:
         if self._mqtt is None:
@@ -274,17 +278,35 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
                     elapsed,
                 )
                 return
+            # Zeitstempel bewusst VOR dem Aufruf, nicht in einem finally danach. Das
+            # Rate-Limit des Servers zaehlt eingehende Anfragen, die relevante Groesse ist
+            # also der Abstand zwischen zwei Startzeitpunkten - und der ist so garantiert
+            # >= _MQTT_CRED_COOLDOWN. Ein finally wuerde ab dem ENDE messen und damit zwar
+            # nie weniger, aber je nach Laufzeit deutlich mehr Abstand erzwingen: nach einem
+            # Lauf in den REST_REQUEST_TIMEOUT (30 s) erst 95 s nach dem letzten Start, was
+            # die Erholung ohne Gegenwert verlangsamt. Der Nachteil dieser Variante ist, dass
+            # nach einem solchen Timeout nur ~35 s zwischen Fehlschlag und naechstem Versuch
+            # liegen; da der Server in dem Fall gar nicht geantwortet hat, hat er auch kein
+            # Fenster eroeffnet, das wir verletzen wuerden.
             self._mqtt_cred_last_attempt = time.monotonic()
             try:
                 mqtt_info = await self.api.async_get_mqtt_user_info()
             except NavimowApiError as err:
                 _LOGGER.warning("Navimow: MQTT-Zugangsdaten konnten nicht aufgefrischt werden: %s", err)
                 return
-        await self._mqtt.update_credentials(
-            username=mqtt_info.get("userName"),
-            password=mqtt_info.get("pwdInfo"),
-            access_token=self.api.access_token,
-        )
+        # Wie am Aufrufort im Poll: update_credentials() kann ueber _connect_locked() einen
+        # Verbindungsaufbau ausloesen und dessen Fehler weiterreichen. Hier laeuft das in
+        # einem losgeloesten Task, ein Fehler wuerde also als "Task exception was never
+        # retrieved" auftauchen statt als verstaendliche Warnung - und dieser Aufrufort ist
+        # der haeufigere, er haengt an jedem Disconnect. Der naechste Versuch kommt ohnehin.
+        try:
+            await self._mqtt.update_credentials(
+                username=mqtt_info.get("userName"),
+                password=mqtt_info.get("pwdInfo"),
+                access_token=self.api.access_token,
+            )
+        except Exception:  # noqa: BLE001 - losgeloester Task, darf nicht unbehandelt sterben
+            _LOGGER.warning("Navimow: MQTT-Zugangsdaten konnten nicht uebernommen werden", exc_info=True)
 
     def _handle_mqtt_message(self, topic: str, payload: Any, device_id: str) -> None:
         # Frueher: Vergleich gegen das EINE bekannte self.device_id, alles andere verworfen.
@@ -463,14 +485,23 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
         # MQTT-Client ist fuer alle Geraete gemeinsam, ein Reconnect pro betroffenem Geraet
         # waere redundant (und der zweite wuerde durch den internen _connect_lock in
         # mqtt_client.py ohnehin nur auf den ersten warten).
-        if mismatch_detected and self._mqtt is not None:
-            await self._mqtt.force_reconnect()
+        # MQTT-Pflege ist Beiwerk des Polls, nicht sein Ergebnis: die REST-Daten stehen an
+        # dieser Stelle bereits fest. Ohne dieses try/except wuerde ein Fehler beim
+        # Verbindungsaufbau (Netzwerk, TLS, kein freier Thread) den kompletten Poll-Zyklus
+        # verwerfen, samt bereits geholter Geraetezustaende, und bei anhaltendem Problem bei
+        # jedem Durchgang einen Traceback loggen. Der Neuaufbau wird ohnehin beim naechsten
+        # Poll erneut versucht (siehe update_credentials()).
+        try:
+            if mismatch_detected and self._mqtt is not None:
+                await self._mqtt.force_reconnect()
 
-        # Access-Token rotiert stuendlich - bei jedem Poll an den MQTT-Client durchreichen,
-        # kein separates Refresh-Scheduling noetig (Poll-Intervall ist deutlich kuerzer als
-        # die Token-Lebensdauer). Account-weit, nicht pro Geraet.
-        if self._mqtt is not None:
-            await self._mqtt.update_credentials(access_token=self.api.access_token)
+            # Access-Token rotiert stuendlich - bei jedem Poll an den MQTT-Client
+            # durchreichen, kein separates Refresh-Scheduling noetig (Poll-Intervall ist
+            # deutlich kuerzer als die Token-Lebensdauer). Account-weit, nicht pro Geraet.
+            if self._mqtt is not None:
+                await self._mqtt.update_credentials(access_token=self.api.access_token)
+        except Exception:  # noqa: BLE001 - Poll-Ergebnis darf daran nicht scheitern
+            _LOGGER.warning("Navimow: MQTT-Verbindungspflege fehlgeschlagen", exc_info=True)
 
         return updated
 
@@ -502,7 +533,9 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
             # einem HA-Neustart mitten in der Verifikation verloren, das ist unschaedlich
             # (restart-safe wie bei symcon): kein Kommando-Replay noetig, der naechste normale
             # REST-Poll zeigt den echten Zustand ohnehin.
-            self.hass.async_create_task(self._async_verify_command(device_id, action, spec))
+            self.hass.async_create_task(
+                self._async_verify_command(device_id, action, spec), name="navimow_verify_command"
+            )
         else:
             await self._async_verify_command(device_id, action, spec)
 
