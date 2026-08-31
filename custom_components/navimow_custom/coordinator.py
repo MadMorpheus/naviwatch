@@ -144,6 +144,26 @@ class NavimowData:
     target_zone: int | None = None
     mow_progress_pct: int | None = None
     task_delay: bool | None = None
+    # Kalibrier-Offset: die zuletzt im Zustand "docked" beobachtete pos_x/pos_y - siehe
+    # _apply_dock_calibration(). Kompensiert Restdrift der maehereigenen SLAM/Odometrie-
+    # Positionsschaetzung (der Ursprung (0,0) des Koordinatensystems faellt nicht exakt mit
+    # der physischen Ladestation zusammen, siehe CLAUDE.md "0,75m Abstand trotz angedockt").
+    # None bis zum ersten "docked"-Zustand mit bekannter Position - dock_distance faellt bis
+    # dahin auf die alte, unkalibrierte Annahme (0,0) = Ladestation zurueck.
+    dock_offset_x: float | None = None
+    dock_offset_y: float | None = None
+
+
+def _apply_dock_calibration(data: NavimowData) -> NavimowData:
+    """Im Zustand "docked" die aktuelle Position als neuen Null-Punkt uebernehmen.
+
+    Die Ladestation bewegt sich nicht - jeder erneute Andock-Zustand mit bekannter Position
+    ist daher eine neue, verlaessliche Gelegenheit, den Offset nachzukalibrieren und so
+    akkumulierte Drift seit dem letzten Andocken wieder auszugleichen.
+    """
+    if data.state == "docked" and data.pos_x is not None and data.pos_y is not None:
+        return replace(data, dock_offset_x=data.pos_x, dock_offset_y=data.pos_y)
+    return data
 
 
 class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
@@ -299,7 +319,7 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
                 mqtt_connected=self._mqtt_connected,
                 last_mqtt_update=now,
             )
-        self._push_device_data(device_id, new_data)
+        self._push_device_data(device_id, _apply_dock_calibration(new_data))
 
     def _handle_location_message(self, device_id: str, payload: Any) -> None:
         """Undokumentierter 'location'-Kanal, siehe location.py - noch nicht live verifiziert."""
@@ -311,23 +331,21 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
             # Vor dem ersten REST-Poll gibt es noch kein NavimowData zum Mergen fuer DIESES
             # Geraet - seltener Fall, wird beim naechsten Poll/State-Update nachgeholt.
             return
-        self._push_device_data(
-            device_id,
-            replace(
-                current,
-                pos_x=update.pos_x if update.pos_x is not None else current.pos_x,
-                pos_y=update.pos_y if update.pos_y is not None else current.pos_y,
-                pos_theta=update.pos_theta if update.pos_theta is not None else current.pos_theta,
-                zone=update.zone if update.zone is not None else current.zone,
-                target_zone=update.target_zone if update.target_zone is not None else current.target_zone,
-                mow_progress_pct=(
-                    update.mow_progress_pct
-                    if update.mow_progress_pct is not None
-                    else current.mow_progress_pct
-                ),
-                task_delay=update.task_delay if update.task_delay is not None else current.task_delay,
+        new_data = replace(
+            current,
+            pos_x=update.pos_x if update.pos_x is not None else current.pos_x,
+            pos_y=update.pos_y if update.pos_y is not None else current.pos_y,
+            pos_theta=update.pos_theta if update.pos_theta is not None else current.pos_theta,
+            zone=update.zone if update.zone is not None else current.zone,
+            target_zone=update.target_zone if update.target_zone is not None else current.target_zone,
+            mow_progress_pct=(
+                update.mow_progress_pct
+                if update.mow_progress_pct is not None
+                else current.mow_progress_pct
             ),
+            task_delay=update.task_delay if update.task_delay is not None else current.task_delay,
         )
+        self._push_device_data(device_id, _apply_dock_calibration(new_data))
 
     async def _async_update_data(self) -> dict[str, NavimowData]:
         # Generelles Zeitlimit um den GESAMTEN Zyklus (REST-Call fuer ALLE Geraete + ggf.
@@ -403,27 +421,31 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
                 self._last_watchdog_reconnect.pop(device_id, None)
 
             if current is None:
-                updated[device_id] = NavimowData(
-                    device_id=device_id,
-                    state=canonical,
-                    raw_state=str(raw_state),
-                    battery=battery,
-                    mqtt_connected=self._mqtt_connected,
-                    last_rest_update=now,
-                    last_mqtt_update=self._last_mqtt_update.get(device_id),
+                updated[device_id] = _apply_dock_calibration(
+                    NavimowData(
+                        device_id=device_id,
+                        state=canonical,
+                        raw_state=str(raw_state),
+                        battery=battery,
+                        mqtt_connected=self._mqtt_connected,
+                        last_rest_update=now,
+                        last_mqtt_update=self._last_mqtt_update.get(device_id),
+                    )
                 )
             else:
                 # replace() statt Neubau, damit per "location"-Kanal bekannte Position/Zone
                 # durch den REST-Poll nicht auf None zurueckgesetzt werden.
-                updated[device_id] = replace(
-                    current,
-                    device_id=device_id,
-                    state=canonical,
-                    raw_state=str(raw_state),
-                    battery=battery,
-                    mqtt_connected=self._mqtt_connected,
-                    last_rest_update=now,
-                    last_mqtt_update=self._last_mqtt_update.get(device_id),
+                updated[device_id] = _apply_dock_calibration(
+                    replace(
+                        current,
+                        device_id=device_id,
+                        state=canonical,
+                        raw_state=str(raw_state),
+                        battery=battery,
+                        mqtt_connected=self._mqtt_connected,
+                        last_rest_update=now,
+                        last_mqtt_update=self._last_mqtt_update.get(device_id),
+                    )
                 )
 
         # EIN gemeinsamer Reconnect fuer ALLE in diesem Zyklus erkannten Mismatches - der

@@ -154,9 +154,15 @@ class NavimowPositionYSensor(NavimowEntity, SensorEntity):
 
 
 class NavimowDockDistanceSensor(NavimowEntity, SensorEntity):
-    """Luftlinien-Abstand von der Ladestation (Ursprung des Koordinatensystems), in Metern.
+    """Luftlinien-Abstand von der Ladestation, in Metern.
 
-    Abgeleitet aus position_x/position_y (sqrt(x^2+y^2)) - kein eigenes Feld aus der API.
+    Abgeleitet aus position_x/position_y - kein eigenes Feld aus der API. Nicht einfach
+    sqrt(x^2+y^2): der Koordinatenursprung (0,0) des Maehers faellt wegen Restdrift der
+    SLAM/Odometrie-Positionsschaetzung nicht exakt mit der physischen Ladestation zusammen
+    (live beobachtet: ~0,75m Anzeige trotz angedockt). Stattdessen wird gegen den zuletzt im
+    Zustand "docked" kalibrierten Nullpunkt (dock_offset_x/y, siehe coordinator.py
+    _apply_dock_calibration) gerechnet - vor der ersten Kalibrierung faellt das auf die alte
+    Annahme (0,0) = Ladestation zurueck.
     Zusatznutzen: Bleibt der Wert trotz state=mowing ueber laengere Zeit unveraendert, ist das
     ein moegliches (zusaetzliches) Freeze-/Stillstand-Signal, unabhaengig vom REST/MQTT-
     Status-Vergleich des Watchdogs.
@@ -176,7 +182,9 @@ class NavimowDockDistanceSensor(NavimowEntity, SensorEntity):
         data = self._device_data
         if data is None or data.pos_x is None or data.pos_y is None:
             return None
-        return round(math.sqrt(data.pos_x**2 + data.pos_y**2), 2)
+        offset_x = data.dock_offset_x if data.dock_offset_x is not None else 0.0
+        offset_y = data.dock_offset_y if data.dock_offset_y is not None else 0.0
+        return round(math.sqrt((data.pos_x - offset_x) ** 2 + (data.pos_y - offset_y) ** 2), 2)
 
 
 class NavimowHeadingSensor(NavimowEntity, SensorEntity):
