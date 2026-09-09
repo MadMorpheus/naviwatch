@@ -40,6 +40,7 @@ Existing community integrations reproducibly freeze after about an hour and don'
 
 * Current mowing zone, route progress (0–100%, confirmed to match the official app exactly), position (local X/Y in meters), heading, and distance from dock
 * Sourced from an undocumented MQTT channel found by inspecting a third-party fork's source code — see [Known risks](#known-risks--this-could-break-and-its-not-in-my-hands-)
+* **Requires a LiDAR-based mower.** On non-LiDAR models (e.g. i105, X420 VisionFence), this channel never delivers data — confirmed via a traffic capture showing that live position for these models is served to the official app through a separate, encrypted REST API outside the public developer API this integration uses. Not something this integration can work around; see [#4](https://github.com/MadMorpheus/naviwatch/issues/4) for the investigation.
 
 ### Native Home Assistant Integration
 

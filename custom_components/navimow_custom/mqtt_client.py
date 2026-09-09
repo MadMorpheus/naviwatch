@@ -324,6 +324,16 @@ class NavimowMqttClient:
             for channel in channels:
                 topic = f"/downlink/vehicle/{device_id}/realtimeDate/{channel}"
                 self._subscribe_and_track(client, topic)
+            # Diagnose-Abonnement fuer Issue #4 (undokumentierter "location"-Kanal liefert bei
+            # einigen Nicht-LiDAR-Modellen nie eine Nachricht, obwohl SUBACK sie annimmt):
+            # testet, ob eine geraete-scoped Wildcard von der Multi-Tenant-Broker-ACL anders
+            # behandelt wird als der bereits gescheiterte root-Wildcard "#" (siehe Docstring
+            # oben), und macht jedes Topic sichtbar, das dieses Geraet tatsaechlich publiziert -
+            # auch eines, von dem wir bisher nichts wissen. Immer aktiv (kein Config-Toggle):
+            # eine zusaetzliche SUBSCRIBE pro Geraet ist vernachlaessigbar, alle daraus
+            # resultierenden Log-Zeilen sind DEBUG-gated.
+            wildcard_topic = f"/downlink/vehicle/{device_id}/#"
+            self._subscribe_and_track(client, wildcard_topic)
 
     def _subscribe_and_track(self, client: mqtt_client.Client, topic: str) -> None:
         _result, mid = client.subscribe(topic)
@@ -415,6 +425,15 @@ class NavimowMqttClient:
             return
         device_id = self._parse_topic(msg.topic)
         if device_id is None:
+            # Topic passt nicht ins erwartete 5-Segment-Schema - insbesondere relevant seit
+            # _subscribe_all() zusaetzlich ein geraete-scoped Wildcard-Abo haelt: genau hier
+            # wuerde ein bislang unbekanntes Topic unter dem Geraet zum ersten Mal sichtbar
+            # (Diagnose fuer Issue #4, "location"-Kanal liefert bei manchen Modellen nie etwas).
+            _LOGGER.debug(
+                "Navimow MQTT: Nachricht auf nicht erkanntem Topic '%s' verworfen (Rohdaten: %s)",
+                msg.topic,
+                msg.payload[:500],
+            )
             return
         try:
             payload = json.loads(msg.payload.decode("utf-8"))
@@ -424,7 +443,20 @@ class NavimowMqttClient:
         # state/event/attributes liefern ein JSON-Objekt, location ein JSON-Array (siehe
         # location.py) - beide Formen durchreichen, alles andere verwerfen.
         if not isinstance(payload, (dict, list)):
+            _LOGGER.debug(
+                "Navimow MQTT: Payload auf Topic '%s' weder Objekt noch Array (Typ %s), verworfen: %s",
+                msg.topic,
+                type(payload).__name__,
+                payload,
+            )
             return
         if isinstance(payload, dict):
             payload.setdefault("device_id", device_id)
+        # Bewusst ohne vollen Payload: der wird kanal-spezifisch in coordinator.py geloggt
+        # (state/event/attributes/location), hier nur der Nachweis "ist angekommen".
+        _LOGGER.debug(
+            "Navimow MQTT: Nachricht auf Topic '%s' angenommen und an Coordinator weitergereicht (Geraet %s)",
+            msg.topic,
+            device_id,
+        )
         self._loop.call_soon_threadsafe(self._on_message, msg.topic, payload, device_id)

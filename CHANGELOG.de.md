@@ -4,6 +4,17 @@ Alle relevanten Änderungen an NaviWatch werden in dieser Datei dokumentiert.
 
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [0.3.3] - 2026-09-07
+
+### Behoben
+
+- **`last_mqtt_update` aktualisierte sich nur beim `state`-Kanal.** `_handle_mqtt_message()` setzte den pro Gerät geführten Zeitstempel, der der Watchdog-Diagnose "verbunden, aber still" zugrunde liegt und als Attribut am Mäher-Entity angezeigt wird, ausschließlich im `state`-Zweig — ein Mäher, der aktiv `event`/`attributes`/`location`-Nachrichten empfing, aber zufällig gerade keine frische `state`-Nachricht bekam, konnte trotzdem einen veralteten Zeitstempel zeigen und damit vortäuschen, MQTT sei länger still gewesen als tatsächlich. Der Zeitstempel wird jetzt bei jedem erfolgreich gerouteten Kanal aktualisiert, nicht mehr nur bei `state`.
+
+### Hinzugefügt
+
+- **Die drei bisher stillen MQTT-Nachrichten-Drop-Pfade loggen jetzt auf `DEBUG`.** Bei der Untersuchung von Issue #4 ("MQTT location channel not working" — mehrere Besitzer von Nicht-LiDAR-Mähern berichten, dass der undokumentierte `location`-Kanal nie eine Nachricht liefert, selbst während aktiven Mähens, obwohl der Broker das Subscribe bestätigt) zeigte sich, dass `_on_mqtt_message()` für eine nicht erkannte Topic-Form, eine JSON-Payload, die weder Objekt noch Array war, und — am wichtigsten — für eine erfolgreich geparste und weitergereichte Nachricht überhaupt kein Logging hatte. Eine Reporterin hatte angeboten, extra einen Custom-Debug-Build zu fahren, nur um das sichtbar zu machen — das ist jetzt nicht mehr nötig. `coordinator.py`s `_handle_location_message()` bekommt dieselbe Behandlung: jede eingehende `location`-Nachricht loggt jetzt unbedingt ihre Payload (analog zum bestehenden Vorgehen bei `event`/`attributes`), und die beiden verbleibenden stillen Drops dort (eine nicht parsbare Payload, oder eine Nachricht vor dem ersten REST-Poll des Geräts) loggen jetzt, warum verworfen wurde.
+- **Ein geräte-scoped Wildcard-Diagnose-Abonnement** (`/downlink/vehicle/{id}/#`), zusätzlich zu den vier bekannten Kanälen. Ein reiner Root-Wildcard (`#`) wurde bereits früher live getestet und lieferte von der Multi-Tenant-Broker-ACL nichts; ein geräte-scoped Wildcard wurde bisher nie ausprobiert und könnte anders behandelt werden — falls ja, macht das jedes Topic sichtbar, das der Mäher jenseits der vier dokumentierten publiziert (inklusive Retained Messages, sofort nach dem Connect sichtbar). Zusammen mit dem Logging oben können Issue-#4-Reporter damit eine endgültige Antwort bekommen — sendet ihr Account/Modell überhaupt jemals irgendetwas zur Position auf irgendeinem Topic — indem sie nur Home Assistants Standard-Debug-Logging für einen Mähdurchgang aktivieren, kein Custom-Build nötig. Immer aktiv, kein Config-Schalter: ein zusätzliches `SUBSCRIBE` pro Gerät ist vernachlässigbar, und die gesamte daraus resultierende Ausgabe ist DEBUG-gated. Bekannte offene Frage, bewusst nicht präventiv behandelt: überlappende Subscriptions könnten bei manchen Brokern theoretisch dazu führen, dass die vier bekannten Topics doppelt zugestellt werden (MQTT 3.1.1 lässt das implementierungsabhängig) — kein Dedup-Code, da bisher nicht beobachtet; bei doppelten Payloads bitte melden.
+
 ## [0.3.2] - 2026-08-31
 
 ### Behoben

@@ -343,6 +343,12 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
             return
         channel = topic.rsplit("/", 1)[-1]
 
+        # Jede erfolgreich geroutete Nachricht zaehlt als Lebenszeichen fuer den Watchdog/die
+        # last_mqtt_update-Anzeige - vorher wurde der Zeitstempel nur beim "state"-Kanal
+        # gesetzt, was event/attributes/location-Aktivitaet ignorierte (Bugfix v0.3.3).
+        now = dt_util.utcnow()
+        self._last_mqtt_update[device_id] = now
+
         if channel == "location":
             self._handle_location_message(device_id, payload)
             return
@@ -350,11 +356,11 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
         if channel != "state":
             # event/attributes: in ueber 4 Minuten Live-Test (Dock + aktives Maehen) nie
             # beobachtet (siehe sdk-notizen.md) - trotzdem geloggt fuer spaetere Auswertung.
+            # Dank des geraete-scoped Wildcard-Diagnose-Abos in mqtt_client.py laeuft hier seit
+            # v0.3.3 auch jeder bislang unbekannte 5. Kanal durch, falls es einen gibt.
             _LOGGER.debug("Navimow MQTT %s payload (Geraet %s): %s", channel, device_id, payload)
             return
 
-        now = dt_util.utcnow()
-        self._last_mqtt_update[device_id] = now
         current = (self.data or {}).get(device_id)
         raw_state = payload.get("state")
         battery = payload.get("battery")
@@ -384,13 +390,28 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
 
     def _handle_location_message(self, device_id: str, payload: Any) -> None:
         """Undokumentierter 'location'-Kanal, siehe location.py - noch nicht live verifiziert."""
+        # Diagnose fuer Issue #4 ("location"-Kanal liefert bei manchen Nicht-LiDAR-Modellen nie
+        # etwas): unbedingtes Log, analog zum bestehenden event/attributes-Log oben - damit
+        # erzeugt JEDE eingehende location-Nachricht eine sichtbare DEBUG-Zeile, egal ob sie
+        # sich unten als parsbar/verwertbar erweist oder nicht.
+        _LOGGER.debug("Navimow MQTT location payload (Geraet %s): %s", device_id, payload)
         update = parse_location_payload(payload)
         if update is None:
+            _LOGGER.debug(
+                "Navimow MQTT: location-Payload fuer Geraet %s enthielt nichts Verwertbares "
+                "(kein bekannter type-Eintrag / leeres Array) - verworfen.",
+                device_id,
+            )
             return
         current = (self.data or {}).get(device_id)
         if current is None:
             # Vor dem ersten REST-Poll gibt es noch kein NavimowData zum Mergen fuer DIESES
             # Geraet - seltener Fall, wird beim naechsten Poll/State-Update nachgeholt.
+            _LOGGER.debug(
+                "Navimow MQTT: location-Update fuer Geraet %s vor dem ersten REST-Poll "
+                "empfangen, noch kein NavimowData zum Mergen vorhanden - verworfen.",
+                device_id,
+            )
             return
         new_data = replace(
             current,

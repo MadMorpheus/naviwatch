@@ -4,6 +4,17 @@ All notable changes to NaviWatch are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.3] - 2026-09-07
+
+### Fixed
+
+- **`last_mqtt_update` only advanced on the `state` channel.** `_handle_mqtt_message()` set the per-device timestamp used by the watchdog's "connected but silent" diagnosis, and shown as an attribute on the mower entity, exclusively inside the `state` branch — a mower that was actively receiving `event`/`attributes`/`location` messages but happened not to get a fresh `state` push could still show a stale timestamp, understating how recently MQTT had actually been heard from. The timestamp is now updated for every successfully routed channel, not just `state`.
+
+### Added
+
+- **The three previously-silent MQTT message drop paths now log at `DEBUG`.** Investigating issue #4 ("MQTT location channel not working" — several non-LiDAR mower owners report the undocumented `location` channel never delivers a payload, even during active mowing, despite a broker-acknowledged subscription) surfaced that `_on_mqtt_message()` had no logging at all for an unrecognized topic shape, a JSON payload that wasn't an object or array, or — most importantly — a message that parsed successfully and was forwarded. One reporter had offered to run a custom debug build just to see that; it's no longer necessary. `coordinator.py`'s `_handle_location_message()` gets the same treatment: every inbound `location` message now logs its payload unconditionally (matching the existing `event`/`attributes` precedent), and the two remaining silent drops there (an unparseable payload, or one arriving before the device's first REST poll) now log why.
+- **A per-device wildcard diagnostic subscription** (`/downlink/vehicle/{id}/#`), added alongside the four known channels. A bare root wildcard (`#`) was live-tested previously and the multi-tenant broker ACL returned nothing for it; a device-scoped wildcard hasn't been tried before and may be treated differently — if it is, this surfaces any topic the mower publishes beyond the four documented ones (including retained messages, visible immediately after connect). Combined with the logging above, this gives issue #4 reporters a way to get a definitive answer — does their account/model ever publish anything about position on any topic — just by enabling Home Assistant's standard debug logging for one mowing session, no custom build required. Always active, no config toggle: one extra `SUBSCRIBE` per device is negligible, and all resulting output is DEBUG-gated. Known open question, not addressed defensively: overlapping subscriptions could in principle cause the four known topics to be delivered twice by some brokers (MQTT 3.1.1 leaves this implementation-defined) — no deduplication was added since this hasn't been observed; report it if you see duplicate payloads.
+
 ## [0.3.2] - 2026-08-31
 
 ### Fixed

@@ -56,8 +56,6 @@ MQTT_TEARDOWN_TIMEOUT: Final = 10
 # keinen erneuten Reconnect fuer denselben, weiterhin bestehenden Mismatch ausloesen.
 WATCHDOG_RECONNECT_DEBOUNCE: Final = timedelta(minutes=5)
 
-MOWER_STATE_TOPIC_CHANNELS: Final = ("state", "event", "attributes")
-
 CONF_DEVICE_ID: Final = "device_id"
 
 # Bounded Command-Verification nach dem Vorbild von doctee/symcon-navimow (siehe CLAUDE.md):

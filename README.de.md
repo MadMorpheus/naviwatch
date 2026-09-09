@@ -40,6 +40,7 @@ Bestehende Community-Integrationen frieren nach ca. einer Stunde reproduzierbar 
 
 * Aktuelle Mäh-Zone, Routen-Fortschritt (0–100 %, live bestätigt exakt übereinstimmend mit der offiziellen App), Position (lokale X/Y-Koordinaten in Metern), Blickrichtung und Abstand zur Ladestation
 * Stammt aus einem undokumentierten MQTT-Kanal, gefunden durch Einsicht in den Quellcode eines Drittanbieter-Forks — siehe [Bekannte Risiken](#bekannte-risiken--das-könnte-kaputtgehen-und-liegt-nicht-in-meiner-hand-)
+* **Setzt einen LiDAR-basierten Mäher voraus.** Bei Nicht-LiDAR-Modellen (z. B. i105, X420 VisionFence) liefert dieser Kanal nie Daten — per Traffic-Mitschnitt bestätigt, dass die Live-Position bei diesen Modellen der offiziellen App über eine separate, verschlüsselte REST-API bereitgestellt wird, außerhalb der öffentlichen Entwickler-API, die diese Integration nutzt. Das kann diese Integration nicht umgehen; siehe [#4](https://github.com/MadMorpheus/naviwatch/issues/4) für die Recherche dazu.
 
 ### Native Home Assistant Integration
 
