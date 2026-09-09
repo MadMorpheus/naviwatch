@@ -1,0 +1,15 @@
+# Lokale, private Projektnotizen (Adresse, Geräte-Seriennummern, interne Historie)
+CLAUDE.md
+CLAUDE_v*.md
+
+# MCP-Server-Konfiguration enthaelt ein Home-Assistant-Access-Token
+.mcp.json
+
+# Interne Recherche-Notizen, nicht Teil der oeffentlichen Doku
+dokumentation/
+
+# Read-only Referenz-Klon von segwaynavimow/navimow-sdk, nicht unser Code
+sdk-reference/
+
+# Wegwerf-Testskripte inkl. erfasster Tokens/Geraetedaten
+test-skripte/
