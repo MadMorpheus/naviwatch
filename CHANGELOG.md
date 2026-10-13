@@ -4,6 +4,21 @@ All notable changes to NaviWatch are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.4] - 2026-10-13
+
+### Added
+
+- **Location watchdog.** While mowing, the `location` channel normally delivers a message about every 2 seconds. If the REST poll reports `mowing` but no `location` message has arrived for more than 90 s (`LOCATION_STALE_THRESHOLD`), the channel is considered stuck and a MQTT reconnect is forced, with the same 5-minute debounce as the state watchdog. Silence is measured from the later of the last `location` message and the start of the current mowing phase, so an old message from a previous run does not trigger it right after a mow starts. Devices that have never sent a `location` message since startup (models without the channel, see #4) are ignored. Previously a stuck `location` channel went unnoticed — zone and progress sensors stayed at their last value or `unknown` for up to an hour, because silence on MQTT alone was never treated as a failure signal.
+
+### Changed
+
+- **MQTT keepalive lowered from 2400 s to 120 s.** With a 40-minute keepalive, paho only notices a half-open TCP connection (the broker side is gone but the local socket still looks open) when a PINGRESP fails to arrive — 40 to 80 minutes later. During that time the client reports "connected" but receives nothing. 120 s still keeps the broker's idle disconnect after one hour away and detects dead connections within about three minutes. The value matches the official NavimowHA v1.1.1.
+
+### Fixed
+
+- **A REST response could overwrite a newer MQTT state.** If a `state` push arrived while the REST call was in flight, the older REST status replaced it and the difference was additionally counted as a watchdog mismatch, forcing an unnecessary reconnect. Because MQTT sends nothing further while the state is stable, the outdated value could stay visible until the next poll. The poll now remembers when the last `state` push arrived before the call and keeps the MQTT state (without a watchdog check) if a newer one came in meanwhile — the same approach as NavimowHA PR #94.
+- **Pushes received during MQTT maintenance were lost.** The poll built its result before awaiting `force_reconnect()`/`update_credentials()`; any push that arrived during those awaits — typically right after a reconnect — was overwritten when the result was returned. The result is now assembled after the MQTT maintenance on top of the current data.
+
 ## [0.3.3] - 2026-09-07
 
 ### Fixed

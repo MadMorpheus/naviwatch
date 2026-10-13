@@ -4,6 +4,21 @@ Alle relevanten Änderungen an NaviWatch werden in dieser Datei dokumentiert.
 
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [0.3.4] - 2026-10-13
+
+### Hinzugefügt
+
+- **Location-Watchdog.** Beim Mähen liefert der `location`-Kanal normalerweise etwa alle 2 Sekunden eine Nachricht. Meldet der REST-Abruf `mowing`, kam aber seit mehr als 90 s (`LOCATION_STALE_THRESHOLD`) keine `location`-Nachricht, gilt der Kanal als hängend und es wird ein MQTT-Reconnect erzwungen – mit demselben 5-Minuten-Debounce wie beim State-Watchdog. Die Stille wird ab der letzten `location`-Nachricht bzw. ab Beginn der aktuellen Mähphase gemessen, je nachdem was später liegt; eine alte Nachricht vom vorherigen Durchgang löst also direkt nach dem Mähstart nichts aus. Geräte, die seit dem Start nie eine `location`-Nachricht geschickt haben (Modelle ohne diesen Kanal, siehe #4), werden ignoriert. Bisher blieb ein hängender `location`-Kanal unbemerkt – Zonen- und Fortschrittssensor blieben bis zu einer Stunde auf dem letzten Wert oder `unknown`, weil reine MQTT-Stille nie als Fehlersignal galt.
+
+### Geändert
+
+- **MQTT-Keepalive von 2400 s auf 120 s gesenkt.** Mit 40 Minuten Keepalive bemerkt paho eine halb-offene TCP-Verbindung (Broker-Seite weg, lokaler Socket wirkt noch offen) erst, wenn eine PINGRESP ausbleibt – 40 bis 80 Minuten später. Bis dahin meldet der Client „verbunden“, empfängt aber nichts. 120 s halten die Trennung durch den Broker nach einer Stunde Inaktivität genauso fern und erkennen tote Verbindungen nach etwa drei Minuten. Der Wert entspricht dem der offiziellen NavimowHA v1.1.1.
+
+### Behoben
+
+- **Eine REST-Antwort konnte einen neueren MQTT-Zustand überschreiben.** Kam während des REST-Aufrufs ein `state`-Push an, ersetzte der ältere REST-Status ihn, und der Unterschied wurde zusätzlich als Watchdog-Mismatch gewertet, was einen unnötigen Reconnect auslöste. Da MQTT bei stabilem Zustand nichts weiter schickt, konnte der veraltete Wert bis zum nächsten Abruf stehen bleiben. Der Abruf merkt sich jetzt vor dem Aufruf, wann der letzte `state`-Push kam, und behält bei einem neueren Push den MQTT-Zustand (ohne Watchdog-Abgleich) – derselbe Ansatz wie NavimowHA PR #94.
+- **Während der MQTT-Pflege eingegangene Pushes gingen verloren.** Der Abruf baute sein Ergebnis, bevor er `force_reconnect()`/`update_credentials()` abwartete; jeder Push, der währenddessen ankam – typischerweise direkt nach einem Reconnect –, wurde beim Zurückgeben des Ergebnisses überschrieben. Das Ergebnis wird jetzt erst nach der MQTT-Pflege auf dem aktuellen Datenstand zusammengebaut.
+
 ## [0.3.3] - 2026-09-07
 
 ### Behoben

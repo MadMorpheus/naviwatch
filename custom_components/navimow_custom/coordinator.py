@@ -59,6 +59,7 @@ from .const import (
     COMMAND_VERIFICATION_SPECS,
     COORDINATOR_UPDATE_TIMEOUT,
     DOMAIN,
+    LOCATION_STALE_THRESHOLD,
     REST_POLL_INTERVAL,
     WATCHDOG_RECONNECT_DEBOUNCE,
 )
@@ -191,6 +192,14 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
         self._last_mqtt_update: dict[str, datetime] = {}
         self._mqtt_connected = False
         self._last_watchdog_reconnect: dict[str, datetime] = {}
+        # Monotone Empfangszeitpunkte, getrennt nach Kanal (nicht _last_mqtt_update, das jede
+        # Nachricht zaehlt): "state" fuer den Frischeschutz im Poll, "location" fuer den
+        # Location-Watchdog. _mowing_since: Beginn der aktuellen Maehphase, damit eine
+        # location-Nachricht von gestern nicht direkt nach Maehstart als "stumm" gilt.
+        self._last_mqtt_state_update: dict[str, float] = {}
+        self._last_location_update: dict[str, float] = {}
+        self._mowing_since: dict[str, float] = {}
+        self._last_location_reconnect: dict[str, datetime] = {}
         # Pro Geraet, nicht mehr global - jedes Geraet kann unabhaengig ein eigenes
         # Kommando bekommen und braucht daher sein eigenes Verifikationsergebnis.
         self.last_command_result: dict[str, dict[str, Any]] = {}
@@ -259,6 +268,10 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
         current[device_id] = new_data
         self.data = current
         self.async_update_listeners()
+
+    def _track_mowing_start(self, device_id: str, old_state: str | None, new_state: str) -> None:
+        if new_state == "mowing" and old_state != "mowing":
+            self._mowing_since[device_id] = time.monotonic()
 
     def _handle_mqtt_connection_changed(self, connected: bool) -> None:
         # Seit der MQTT-Client auch fehlgeschlagene Verbindungsversuche meldet (on_connect_fail),
@@ -361,9 +374,13 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
             _LOGGER.debug("Navimow MQTT %s payload (Geraet %s): %s", channel, device_id, payload)
             return
 
+        self._last_mqtt_state_update[device_id] = time.monotonic()
         current = (self.data or {}).get(device_id)
         raw_state = payload.get("state")
         battery = payload.get("battery")
+        self._track_mowing_start(
+            device_id, current.state if current else None, _canonical_state(raw_state)
+        )
 
         if current is None:
             new_data = NavimowData(
@@ -395,6 +412,9 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
         # erzeugt JEDE eingehende location-Nachricht eine sichtbare DEBUG-Zeile, egal ob sie
         # sich unten als parsbar/verwertbar erweist oder nicht.
         _LOGGER.debug("Navimow MQTT location payload (Geraet %s): %s", device_id, payload)
+        # Lebenszeichen fuer den Location-Watchdog schon bei Eingang, auch wenn der Payload
+        # unten nichts Verwertbares enthaelt - es geht darum, ob der Kanal lebt.
+        self._last_location_update[device_id] = time.monotonic()
         update = parse_location_payload(payload)
         if update is None:
             _LOGGER.debug(
@@ -448,6 +468,14 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
         if not self.device_ids:
             raise UpdateFailed("Kein Navimow-Geraet konfiguriert")
 
+        # Frischeschutz (analog segwaynavimow/NavimowHA v1.1.1, PR #94): "state"-Empfangszeit
+        # VOR dem REST-Call merken. Kommt waehrend des Calls (oder der MQTT-Pflege unten) ein
+        # MQTT-State an, ist der neuer als die REST-Antwort - dann gewinnt MQTT, und der
+        # Unterschied wird auch NICHT als Watchdog-Mismatch gewertet (sonst: falscher
+        # Reconnect + aelterer Zustand bis zum naechsten Poll, weil bei stabilem Zustand kein
+        # weiterer Push kommt).
+        state_ts_before = dict(self._last_mqtt_state_update)
+
         try:
             # EIN REST-Call fuer ALLE Geraete - async_get_vehicle_status hat eine Geraeteliste
             # schon immer akzeptiert, dafuer war KEINE Aenderung an api.py noetig.
@@ -458,9 +486,13 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
             raise UpdateFailed("Navimow lieferte keinen Geraetestatus")
 
         now = dt_util.utcnow()
+        now_mono = time.monotonic()
         current_all = self.data or {}
-        updated: dict[str, NavimowData] = dict(current_all)
-        mismatch_detected = False
+        rest_states: dict[str, tuple[str, str, int]] = {}
+        reconnect_reasons: list[str] = []
+
+        def _pushed_since_fetch(device_id: str) -> bool:
+            return self._last_mqtt_state_update.get(device_id) != state_ts_before.get(device_id)
 
         for status in statuses:
             device_id = _status_device_id(status)
@@ -472,10 +504,17 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
 
             raw_state = status.get("vehicleState", "unknown")
             canonical = _canonical_state(raw_state)
-            battery = _extract_battery(status)
+            rest_states[device_id] = (canonical, str(raw_state), _extract_battery(status))
 
             current = current_all.get(device_id)
-            if current is not None and current.state != canonical:
+            if _pushed_since_fetch(device_id):
+                _LOGGER.debug(
+                    "Navimow (%s): MQTT-State waehrend des REST-Calls empfangen - REST-Status "
+                    "'%s' verworfen, kein Watchdog-Abgleich in diesem Zyklus.",
+                    device_id,
+                    canonical,
+                )
+            elif current is not None and current.state != canonical:
                 last_reconnect = self._last_watchdog_reconnect.get(device_id)
                 since_last_reconnect = now - last_reconnect if last_reconnect else None
                 if since_last_reconnect is not None and since_last_reconnect < WATCHDOG_RECONNECT_DEBOUNCE:
@@ -495,53 +534,28 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
                         canonical,
                         current.state,
                     )
-                    mismatch_detected = True
+                    reconnect_reasons.append(f"state-mismatch {device_id}")
                     self._last_watchdog_reconnect[device_id] = now
             elif current is not None:
                 # Mismatch fuer DIESES Geraet aufgeloest - dessen Debounce-Fenster zuruecksetzen,
                 # damit ein kuenftiger, neuer Mismatch bei ihm sofort wieder greift.
                 self._last_watchdog_reconnect.pop(device_id, None)
 
-            if current is None:
-                updated[device_id] = _apply_dock_calibration(
-                    NavimowData(
-                        device_id=device_id,
-                        state=canonical,
-                        raw_state=str(raw_state),
-                        battery=battery,
-                        mqtt_connected=self._mqtt_connected,
-                        last_rest_update=now,
-                        last_mqtt_update=self._last_mqtt_update.get(device_id),
-                    )
-                )
-            else:
-                # replace() statt Neubau, damit per "location"-Kanal bekannte Position/Zone
-                # durch den REST-Poll nicht auf None zurueckgesetzt werden.
-                updated[device_id] = _apply_dock_calibration(
-                    replace(
-                        current,
-                        device_id=device_id,
-                        state=canonical,
-                        raw_state=str(raw_state),
-                        battery=battery,
-                        mqtt_connected=self._mqtt_connected,
-                        last_rest_update=now,
-                        last_mqtt_update=self._last_mqtt_update.get(device_id),
-                    )
-                )
+            if self._location_channel_stale(device_id, canonical, now, now_mono):
+                reconnect_reasons.append(f"location stumm {device_id}")
 
-        # EIN gemeinsamer Reconnect fuer ALLE in diesem Zyklus erkannten Mismatches - der
+        # EIN gemeinsamer Reconnect fuer ALLE in diesem Zyklus erkannten Probleme - der
         # MQTT-Client ist fuer alle Geraete gemeinsam, ein Reconnect pro betroffenem Geraet
         # waere redundant (und der zweite wuerde durch den internen _connect_lock in
         # mqtt_client.py ohnehin nur auf den ersten warten).
-        # MQTT-Pflege ist Beiwerk des Polls, nicht sein Ergebnis: die REST-Daten stehen an
-        # dieser Stelle bereits fest. Ohne dieses try/except wuerde ein Fehler beim
-        # Verbindungsaufbau (Netzwerk, TLS, kein freier Thread) den kompletten Poll-Zyklus
-        # verwerfen, samt bereits geholter Geraetezustaende, und bei anhaltendem Problem bei
-        # jedem Durchgang einen Traceback loggen. Der Neuaufbau wird ohnehin beim naechsten
-        # Poll erneut versucht (siehe update_credentials()).
+        # MQTT-Pflege ist Beiwerk des Polls, nicht sein Ergebnis: Ohne dieses try/except wuerde
+        # ein Fehler beim Verbindungsaufbau (Netzwerk, TLS, kein freier Thread) den kompletten
+        # Poll-Zyklus verwerfen, samt bereits geholter Geraetezustaende, und bei anhaltendem
+        # Problem bei jedem Durchgang einen Traceback loggen. Der Neuaufbau wird ohnehin beim
+        # naechsten Poll erneut versucht (siehe update_credentials()).
         try:
-            if mismatch_detected and self._mqtt is not None:
+            if reconnect_reasons and self._mqtt is not None:
+                _LOGGER.info("Navimow Watchdog: erzwinge Reconnect (%s)", ", ".join(reconnect_reasons))
                 await self._mqtt.force_reconnect()
 
             # Access-Token rotiert stuendlich - bei jedem Poll an den MQTT-Client
@@ -552,7 +566,89 @@ class NavimowCoordinator(DataUpdateCoordinator[dict[str, NavimowData]]):
         except Exception:  # noqa: BLE001 - Poll-Ergebnis darf daran nicht scheitern
             _LOGGER.warning("Navimow: MQTT-Verbindungspflege fehlgeschlagen", exc_info=True)
 
+        # Ergebnis ERST JETZT zusammenbauen, auf dem aktuellen self.data: waehrend der awaits
+        # der MQTT-Pflege oben koennen Pushes eingegangen sein (gerade nach einem Reconnect).
+        # Frueher wurde das Ergebnis vorher gebaut und hat diese Pushes beim Zurueckgeben
+        # wieder ueberschrieben. Ab hier kein await mehr bis zum return.
+        latest_all = self.data or {}
+        updated: dict[str, NavimowData] = dict(latest_all)
+        for device_id, (canonical, raw_state, battery) in rest_states.items():
+            current = latest_all.get(device_id)
+            if current is None:
+                self._track_mowing_start(device_id, None, canonical)
+                updated[device_id] = _apply_dock_calibration(
+                    NavimowData(
+                        device_id=device_id,
+                        state=canonical,
+                        raw_state=raw_state,
+                        battery=battery,
+                        mqtt_connected=self._mqtt_connected,
+                        last_rest_update=now,
+                        last_mqtt_update=self._last_mqtt_update.get(device_id),
+                    )
+                )
+                continue
+            if _pushed_since_fetch(device_id):
+                # MQTT ist neuer: Zustand/Akku aus dem Push behalten, nur REST-Zeitstempel setzen.
+                canonical, raw_state, battery = current.state, current.raw_state, current.battery
+            else:
+                self._track_mowing_start(device_id, current.state, canonical)
+            # replace() statt Neubau, damit per "location"-Kanal bekannte Position/Zone
+            # durch den REST-Poll nicht auf None zurueckgesetzt werden.
+            updated[device_id] = _apply_dock_calibration(
+                replace(
+                    current,
+                    device_id=device_id,
+                    state=canonical,
+                    raw_state=raw_state,
+                    battery=battery,
+                    mqtt_connected=self._mqtt_connected,
+                    last_rest_update=now,
+                    last_mqtt_update=self._last_mqtt_update.get(device_id),
+                )
+            )
+
         return updated
+
+    def _location_channel_stale(
+        self, device_id: str, rest_state: str, now: datetime, now_mono: float
+    ) -> bool:
+        """Location-Watchdog: True, wenn der location-Kanal beim Maehen haengt.
+
+        Siehe LOCATION_STALE_THRESHOLD in const.py. Gemessen ab der juengsten location-Nachricht
+        bzw. dem Beginn der aktuellen Maehphase, je nachdem was spaeter liegt.
+        """
+        last_location = self._last_location_update.get(device_id)
+        if rest_state != "mowing" or last_location is None:
+            # Nicht beim Maehen, oder Geraet hat seit dem Start nie location geliefert
+            # (Modell ohne location-Kanal, Issue #4) - nichts zu beurteilen.
+            self._last_location_reconnect.pop(device_id, None)
+            return False
+        # Kennt der Coordinator den Maehbeginn noch nicht (Zustand kam gerade erst per REST),
+        # zaehlt dieser Poll als Beginn - die Schwelle laeuft dann ab jetzt.
+        mowing_since = self._mowing_since.setdefault(device_id, now_mono)
+        silent_for = now_mono - max(last_location, mowing_since)
+        if silent_for <= LOCATION_STALE_THRESHOLD.total_seconds():
+            self._last_location_reconnect.pop(device_id, None)
+            return False
+        last_reconnect = self._last_location_reconnect.get(device_id)
+        if last_reconnect is not None and now - last_reconnect < WATCHDOG_RECONNECT_DEBOUNCE:
+            _LOGGER.debug(
+                "Navimow Location-Watchdog (%s): Kanal weiter stumm (%.0fs), letzter Reconnect "
+                "erst %s her - uebersprungen (Debounce).",
+                device_id,
+                silent_for,
+                now - last_reconnect,
+            )
+            return False
+        _LOGGER.warning(
+            "Navimow Location-Watchdog (%s): Maeher maeht laut REST, aber seit %.0fs keine "
+            "location-Nachricht - Kanal haengt vermutlich.",
+            device_id,
+            silent_for,
+        )
+        self._last_location_reconnect[device_id] = now
+        return True
 
     async def async_shutdown(self) -> None:
         if self._mqtt is not None:

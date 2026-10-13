@@ -37,10 +37,15 @@ COORDINATOR_UPDATE_TIMEOUT: Final = 60
 # primaerer Aktualisierungsweg.
 REST_POLL_INTERVAL: Final = timedelta(seconds=120)
 
-# MQTT-Keepalive: 40 Minuten, um vor der beobachteten "1h ohne Traffic"-Trennung des
-# Segway-Brokers noch Protokoll-Traffic (PINGREQ/PINGRESP) zu erzeugen (siehe sdk-notizen.md,
-# Freeze-Bug-Hypothese aus den mower_sdk-Kommentaren).
-MQTT_KEEPALIVE_SECONDS: Final = 2400
+# MQTT-Keepalive: urspruenglich 40 Minuten, nur um vor der beobachteten "1h ohne Traffic"-
+# Trennung des Segway-Brokers noch Protokoll-Traffic zu erzeugen. Nebenwirkung: paho erkennt
+# eine halb-offene TCP-Verbindung (Gegenstelle weg, Socket lokal noch "offen") erst, wenn eine
+# PINGRESP ausbleibt - bei 2400s also erst nach 40-80 Minuten. Bis dahin meldet der Client
+# "verbunden", es kommen aber keine Nachrichten mehr - passt zu den ~1h-Ausfaellen vom
+# 2026-07-13 und den stummen location-Phasen. 120s wie in segwaynavimow/NavimowHA v1.1.1
+# (PR #60, vom Segway-Maintainer gemergt - der Broker akzeptiert den Wert also); haelt die
+# 1h-Trennung genauso fern und erkennt tote Verbindungen nach spaetestens ~3 Minuten.
+MQTT_KEEPALIVE_SECONDS: Final = 120
 MQTT_RECONNECT_MIN_DELAY: Final = 1
 MQTT_RECONNECT_MAX_DELAY: Final = 60
 
@@ -55,6 +60,14 @@ MQTT_TEARDOWN_TIMEOUT: Final = 10
 # 15:32 fuer denselben Mismatch). Debounce: nach einem erzwungenen Reconnect fuer diese Dauer
 # keinen erneuten Reconnect fuer denselben, weiterhin bestehenden Mismatch ausloesen.
 WATCHDOG_RECONNECT_DEBOUNCE: Final = timedelta(minutes=5)
+
+# Location-Watchdog: waehrend aktivem Maehen kommt auf dem "location"-Kanal live beobachtet
+# etwa alle 2s eine Nachricht. Bleibt er laenger als diese Schwelle stumm, obwohl der Maeher
+# laut REST maeht, haengt der Kanal (2026-07-13, 2026-07-16 mehrfach beobachtet) - anders als
+# Stille auf "state", die bei stabilem Maehen normal ist, ist das ein belastbares Signal.
+# Greift nur fuer Geraete, die seit dem Start schon einmal location geliefert haben (manche
+# Nicht-LiDAR-Modelle senden nie etwas, Issue #4). Reconnect-Debounce wie oben.
+LOCATION_STALE_THRESHOLD: Final = timedelta(seconds=90)
 
 CONF_DEVICE_ID: Final = "device_id"
 

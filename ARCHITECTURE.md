@@ -13,6 +13,8 @@ NaviWatch combines two data sources:
 
 A watchdog compares the two on every REST poll: if the REST-reported state differs from the last MQTT-reported state, it forces an MQTT reconnect (with a 5-minute debounce so the same persisting mismatch doesn't retrigger it repeatedly). This is what makes the integration resilient against the freeze bug seen in other Navimow integrations — REST polling is deliberately kept independent of MQTT's own message-driven update timing (see "Why entity updates and the poll schedule are kept separate" below for why that independence matters).
 
+A second watchdog covers the `location` channel, which can get stuck on its own while `state` keeps working: if REST reports `mowing` but no `location` message has arrived for more than 90 seconds (it normally arrives about every 2 seconds while mowing), the same reconnect is forced, with the same debounce. Devices that never sent a `location` message since startup are skipped, since some models don't use that channel. A REST response is also discarded in favour of MQTT if a `state` push arrived while the REST call was in flight, so an older REST answer can neither overwrite a newer state nor count as a mismatch.
+
 ## Multiple mowers on one account
 
 A single coordinator manages every mower on an account together, not one coordinator per device: `coordinator.data` is a `dict[device_id, NavimowData]`, one REST poll per cycle fetches the status of all devices at once, and one shared MQTT client subscribes to every device's channels. Incoming MQTT messages are routed to the right device entry using the `device_id` embedded in the topic. Each entity also knows its own `device_id` and only ever reads its own slice of that shared dictionary.
