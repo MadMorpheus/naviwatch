@@ -4,6 +4,12 @@ Alle relevanten Änderungen an NaviWatch werden in dieser Datei dokumentiert.
 
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [0.3.5] - 2026-10-13
+
+### Behoben
+
+- **Die Integration hat sich jede Stunde selbst neu geladen.** Der Update-Listener des Config-Entrys, der geänderte Optionen wie das Poll-Intervall übernehmen soll, feuerte auch jedes Mal, wenn Home Assistants `OAuth2Session` den stündlich rotierten Access-Token in den Entry zurückschrieb. Jede Token-Erneuerung lud dadurch die komplette Integration neu: Alle Entitäten waren etwa eine Sekunde `unavailable`, Zonen- und Mähfortschritt-Sensor fielen bis zur nächsten Fortschrittsnachricht des Mähers auf `unknown` zurück (beim Mähen ein bis drei Minuten), und jedes Mal wurde ein komplett neuer MQTT-Client aufgebaut. Das war die Ursache der seit Juli beobachteten kurzen stündlichen Aussetzer. Der Listener lädt jetzt nur noch neu, wenn sich die Optionen tatsächlich geändert haben.
+
 ## [0.3.4] - 2026-10-13
 
 ### Hinzugefügt

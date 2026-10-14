@@ -58,6 +58,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Der Update-Listener feuert bei JEDER Aenderung am Entry, nicht nur bei Options-
+    # Aenderungen - auch wenn OAuth2Session den stuendlich rotierten Token in entry.data
+    # zurueckschreibt. Ohne diesen Vergleich wurde die Integration dadurch jede Stunde
+    # komplett neu geladen (live beobachtet 2026-10-13: alle Entitaeten ~1 s unavailable,
+    # Zone/Fortschritt danach minutenlang unknown, jedes Mal ein neuer MQTT-Client).
+    loaded_options = dict(entry.options)
+
+    async def _async_update_listener(hass: HomeAssistant, updated_entry: ConfigEntry) -> None:
+        """Options (z.B. Poll-Intervall) geaendert -> Entry neu laden."""
+        if dict(updated_entry.options) == loaded_options:
+            return
+        await hass.config_entries.async_reload(updated_entry.entry_id)
+
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 
@@ -68,8 +82,3 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         coordinator: NavimowCoordinator = hass.data[DOMAIN].pop(entry.entry_id)
         await coordinator.async_shutdown()
     return unload_ok
-
-
-async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Options (z.B. Poll-Intervall) geaendert -> Entry neu laden."""
-    await hass.config_entries.async_reload(entry.entry_id)

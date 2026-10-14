@@ -4,6 +4,12 @@ All notable changes to NaviWatch are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.5] - 2026-10-13
+
+### Fixed
+
+- **The integration reloaded itself every hour.** The config entry's update listener, meant to apply changed options such as the poll interval, also fired whenever Home Assistant's `OAuth2Session` wrote the hourly rotated access token back into the entry. Each token refresh therefore reloaded the whole integration: all entities went `unavailable` for about a second, the zone and mowing-progress sensors fell back to `unknown` until the mower's next progress message (one to three minutes while mowing), and a brand-new MQTT client was set up each time. This was the cause of the hourly short blips observed since July. The listener now reloads only when the options have actually changed.
+
 ## [0.3.4] - 2026-10-13
 
 ### Added
